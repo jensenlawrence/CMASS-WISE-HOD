@@ -1,0 +1,131 @@
+{
+    "CMASS HOD": {
+        "M_min": {
+            "val": 13.04,
+            "sample": true,
+            "sample_min": 12.7,
+            "sample_max": 13.3,
+            "sample_div": 5
+        },
+        "M_1": {
+            "val": 14.05,
+            "sample": true,
+            "sample_min": 13.7,
+            "sample_max": 14.3,
+            "sample_div": 5
+        },
+        "alpha": {
+            "val": 0.97,
+            "sample": true,
+            "sample_min": 0.75,
+            "sample_max": 1.25,
+            "sample_div": 5
+        },
+        "M_0": {
+            "val": 13.01,
+            "sample": true,
+            "sample_min": 12.3,
+            "sample_max": 13.7,
+            "sample_div": 5
+        },
+        "sig_logm": {
+            "val": 0.577,
+            "sample": true,
+            "sample_min": 0.01,
+            "sample_max": 1.00,
+            "sample_div": 5
+        },
+        "central": {
+            "val": true,
+            "sample": false
+        }
+    },
+
+    "WISE HOD": {
+        "M_min": {
+            "val": 12.99133,
+            "sample": true,
+            "sample_min": 12.7,
+            "sample_max": 13.3,
+            "sample_div": 5
+        },
+        "M_1": {
+            "val": 13.825,
+            "sample": true,
+            "sample_min": 13.5,
+            "sample_max": 14.1,
+            "sample_div": 5
+        },
+        "alpha": {
+            "val": 0.995,
+            "sample": true,
+            "sample_min": 0.75,
+            "sample_max": 1.25,
+            "sample_div": 5
+        },
+        "M_0": {
+            "val": 12.84,
+            "sample": true,
+            "sample_min": 12.1,
+            "sample_max": 13.5,
+            "sample_div": 5
+        },
+        "sig_logm": {
+            "val": 0.56210,
+            "sample": true,
+            "sample_min": 0.01,
+            "sample_max": 1.00,
+            "sample_div": 5
+        },
+        "central": {
+            "val": false,
+            "sample": false
+        }
+    },
+
+    "galaxy_corr": {
+        "R_ss": {
+            "val": 0.0,
+            "sample": false
+        },
+        "R_cs": {
+            "val": 0.0,
+            "sample": false
+        },
+        "R_sc": {
+            "val": 0.0,
+            "sample": false
+        }
+    },
+
+    "nbar": {
+        "CMASS": 0.0003468998743287456,
+        "WISE": 0.0003603070604637557
+    },
+
+    "halo_params": {
+        "z": 0.475,
+        "zmin": 0.450,
+        "zmax": 0.500,
+        "transfer_model": "CAMB",
+        "cosmo_model": "Planck15",
+        "hmf_model": "Tinker08",
+        "filter_model": "TopHat",
+        "hod_model": "Zheng05",
+        "halo_profile_model": "NFW",
+        "halo_concentration_model": "Duffy08",
+        "bias_model": "Tinker10",
+        "sd_bias_model": "TinkerSD05",
+        "exclusion_model": "NgMatched",
+        "sigma_8": 0.831,
+        "n": 0.9645,
+        "takahashi": true,
+        "hc_spectrum": "nonlinear",
+        "force_1halo_turnover": true,
+        "dr_table": 0.1,
+        "dlnk": 0.1,
+        "dlog10m": 0.01,
+        "Mmin": 0,
+        "Mmax": 18
+    }
+}

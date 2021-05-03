@@ -1,0 +1,11 @@
+argparse
+astropy
+cobaya
+halomod
+hmf
+json
+matplotlib
+numpy
+os
+scipy
+sys
