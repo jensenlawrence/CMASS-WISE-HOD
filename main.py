@@ -5,6 +5,7 @@
 # Basic imports
 import sys
 import argparse
+import numpy as np
 
 # Cosmology imports
 from halomod.cross_correlations import HODCross
@@ -14,7 +15,7 @@ sys.path.append('src')
 from get_model_info import get_model_params
 from crosshod import CrossHOD
 from model_variations import ModelVariations
-from eval_model import cobaya_optimize, cobaya_mcmc
+from eval_model import cobaya_optimize, cobaya_mcmc, grid_search
 from plot_results import wtheta_plot, posterior_plot
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -91,16 +92,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Functions to be executed
-    assert args.action in ('optimize', 'mcmc', 'wtheta_plot', 'posterior_plot'), 'Invalid action chosen.'
+    assert args.action in ('optimize', 'mcmc', 'wtheta_plot', 'posterior_plot', 'gridsearch'), 'Invalid action chosen.'
 
     # Running optimizer
     if args.action == 'optimize':
+
+        # Getting output file name
         method = 'scipy'
-        output = ''
+        output = 'results/optim_cmass_reduced_1'
 
         if output == '':
             output = input('Enter optimizer output path: ')
 
+        # Optimization function
         cobaya_optimize(
             model_variations = cmass_wise_variations,
             likelihood_func = cmass_wise_cross_hod.nbar_likelihood,
@@ -112,11 +116,14 @@ if __name__ == '__main__':
 
     # Running MCMC chains
     elif args.action == 'mcmc':
+
+        # Getting output file name
         output = ''
 
         if output == '':
             output = input('Enter MCMC output path: ')
 
+        # MCMC function
         cobaya_mcmc(
             model_variations = cmass_wise_variations,
             likelihood_func = cmass_wise_cross_hod.nbar_likelihood,
@@ -127,6 +134,8 @@ if __name__ == '__main__':
 
     # Plotting w(theta)
     elif args.action == 'wtheta_plot':
+
+        # Creating plot title
         cmass_s1 = r'$M_{\min} = $' + f'{params["CMASS HOD"]["M_min"]["val"]}'
         cmass_s2 = r'$M_{1} = $' + f'{params["CMASS HOD"]["M_1"]["val"]}'
         cmass_s3 = r'$\alpha = $' + f'{params["CMASS HOD"]["alpha"]["val"]}'
@@ -150,11 +159,13 @@ if __name__ == '__main__':
 
         title = cmass_title + wise_title + R_title
 
+        # Getting output file name
         output = ''
 
         if output == '':
             output = input('Enter the graph output path: ')
 
+        # Plotting function
         wtheta_plot(
             cross_hod = cmass_wise_cross_hod,
             plot_title = title,
@@ -163,6 +174,45 @@ if __name__ == '__main__':
 
     # Plotting MCMC posteriors
     elif args.action == 'posterior_plot':
-        print('Not yet implemented.')
+        samples_path = input('Enter path to MCMC chain results: ')
+
+        names = input('Enter parameter names: ')
+        names = list(map(lambda x: x.strip(), names.split(',')))
+
+        labels = input('Enter LaTeX labels for graph axes: ')
+        labels = list(map(lambda x: x.strip(), labels.split(',')))
+
+        save_as = input('Enter the graph output path: ')
+
+        # Plotting posteriors
+        posterior_plot(
+            samples_path = samples_path,
+            names = names,
+            labels = labels,
+            save_as = save_as
+        )
+
+
+    # CMASS parameters grid search
+    elif args.action == 'gridsearch':
+        output = 'results/grid1'
+
+        grid_search(
+            likelihood_func = cmass_wise_cross_hod.nbar_likelihood,
+            output = output,
+            cmass_M_mins = np.linspace(params["CMASS HOD"]["M_min"]["sample_min"], params["CMASS HOD"]["M_min"]["sample_max"], params["CMASS HOD"]["M_min"]["sample_div"]),
+            cmass_M_1s = np.linspace(params["CMASS HOD"]["M_1"]["sample_min"], params["CMASS HOD"]["M_1"]["sample_max"], params["CMASS HOD"]["M_1"]["sample_div"]),
+            cmass_alphas = np.linspace(params["CMASS HOD"]["alpha"]["sample_min"], params["CMASS HOD"]["alpha"]["sample_max"], params["CMASS HOD"]["alpha"]["sample_div"]),
+            cmass_M_0s = np.linspace(params["CMASS HOD"]["M_0"]["sample_min"], params["CMASS HOD"]["M_0"]["sample_max"], params["CMASS HOD"]["M_0"]["sample_div"]),
+            cmass_sig_logms = np.linspace(params["CMASS HOD"]["sig_logm"]["sample_min"], params["CMASS HOD"]["sig_logm"]["sample_max"], params["CMASS HOD"]["sig_logm"]["sample_div"]),
+            wise_M_mins = np.linspace(params["WISE HOD"]["M_min"]["sample_min"], params["WISE HOD"]["M_min"]["sample_max"], params["WISE HOD"]["M_min"]["sample_div"]),
+            wise_M_1s = np.linspace(params["WISE HOD"]["M_1"]["sample_min"], params["WISE HOD"]["M_1"]["sample_max"], params["WISE HOD"]["M_1"]["sample_div"]),
+            wise_alphas = np.linspace(params["WISE HOD"]["alpha"]["sample_min"], params["WISE HOD"]["alpha"]["sample_max"], params["WISE HOD"]["alpha"]["sample_div"]),
+            wise_M_0s = np.linspace(params["WISE HOD"]["M_0"]["sample_min"], params["WISE HOD"]["M_0"]["sample_max"], params["WISE HOD"]["M_0"]["sample_div"]),
+            wise_sig_logms = np.linspace(params["WISE HOD"]["sig_logm"]["sample_min"], params["WISE HOD"]["sig_logm"]["sample_max"], params["WISE HOD"]["sig_logm"]["sample_div"]),
+            R_ss = params["galaxy_corr"]["R_ss"]["val"],
+            R_cs = params["galaxy_corr"]["R_cs"]["val"],
+            R_sc = params["galaxy_corr"]["R_sc"]["val"]
+        )
 
 # ----------------------------------------------------------------------------------------------------------------------
