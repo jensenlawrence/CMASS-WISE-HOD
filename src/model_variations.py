@@ -12,12 +12,18 @@ from get_model_info import get_model_params
 # Class for varying HOD model parameters
 class ModelVariations:
     """
-    Docstring goes here
+    Class for generating the parameter space for the CMASS-WISE HOD model so optimization and statistical analysis
+    procedures can be performed.
     """
     # Initialize class
     def __init__(self, params_file):
         """
-        Docstring goes here
+        __init__ : self, str -> ModelVariations
+            Defines the attributes of the ModelVariations class.
+
+        params_file : str
+            String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
+            WISE HOD models.
         """
         # Extracting fixed and varied parameter information for optimization calculations
         self.params_file = params_file
@@ -86,7 +92,7 @@ class ModelVariations:
     # Print representation
     def __str__(self):
         """
-        __str__ : Self -> Str
+        __str__ : self -> str
             Provides a string representation of a given instance of the ModelVariations class
         """
         rep_str = '-'*80
@@ -106,12 +112,12 @@ class ModelVariations:
     # Class equivalence
     def __eq__(self, other):
         """
-        __eq__ : Self, Any -> Bool
+        __eq__ : self, any -> bool
             Allows for the comparison of an instance of the ModelVariations class to another object.
             Returns True if both are instances of the ModelVariations class with identical properties, and False
             otherwise
 
-        other : Any
+        other : any
             Any object against which a given instance of the ModelVariations class is compared.
         """
         return isinstance(other, ModelVariations) and (self.sampled == other.sampled) and (self.fixed == other.fixed)

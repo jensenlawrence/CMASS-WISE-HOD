@@ -12,7 +12,12 @@ from astropy.cosmology import Planck15
 # Getting model parameters
 def get_model_params(params_file):
     """
-    Docstring goes here
+    get_model_params : str -> dict
+        Returns a combined dictionary of the BOSS-CMASS and WISE HOD model parameters provided in params_file.
+
+    params_file : str
+        String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
+        WISE HOD models.
     """
     with open(params_file) as f:
         model_params = json.load(f)
@@ -26,7 +31,13 @@ def get_model_params(params_file):
 # Generating model dictionaries
 def get_model_dicts(params_file):
     """
-    Docstring goes here
+    get_model_dicts : str -> dict, dict
+        Returns a dictionary of the BOSS-CMASS HOD model parameters and a dictionary of the WISE HOD model
+        parameters provided in params_file.
+
+    params_file : str
+        String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
+        WISE HOD models.
     """
     model_params = get_model_params(params_file)
     halo_params = model_params['halo_params']

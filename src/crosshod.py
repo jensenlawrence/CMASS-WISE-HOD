@@ -24,71 +24,56 @@ from get_model_info import get_model_params, get_model_dicts
 class AngularCrossCF(CrossCorrelations):
     """
     Framework extension to angular correlation functions.
-
-    Parameters
-    ----------
-    p1 : callable, optional
-        The redshift distribution of the sample. This needs not be normalised to 1, as this will occur internally. May
-        be either a function of radial distance [Mpc/h] or redshift. If a function of radial distance, `p_of_z` must be
-        set to False. Default is a flat distribution in redshift.
-
-    p2 : callable, optional
-        See `p1`. This can optionally be a different function against which to cross-correlate. By default is
-        equivalent to `p1`.
-
-    theta_min, theta_max : float, optional
-        min,max angular separations [Rad]
-
-    theta_num : int, optional
-        Number of steps in angular separation
-
-    theta_log : bool, optional
-        Whether to use logspace for theta values
-
-    zmin, zmax : float, optional
-        The redshift limits of the sample distribution. Note that this is in redshit, regardless of the value of
-        `p_of_z`.
-
-    znum : int, optional
-        Number of steps in redshift grid.
-
-    logu_min, logu_max : float, optional
-        min, max of the log10 of radial separation grid [Mpc/h]. Must be large enough to let the integral over the 3D
-        correlation function to converge.
-
-    unum : int, optional
-        Number of steps in the u grid.
-
-    check_p_norm : bool, optional
-        If False, cancels checking the normalisation of `p1` and `p2`.
-
-    p_of_z : bool, optional
-        Whether `p1` and `p2` are functions of redshift.
-
-    kwargs : unpacked-dict
-        Any keyword arguments passed down to :class:`halomod.HaloModel`.
     """
+    def __init__(self, p1=None, p2=None, theta_min=1e-3 * np.pi / 180.0, theta_max=np.pi / 180.0, theta_num=30,
+                 theta_log=True, zmin=0.2, zmax=0.4, znum=100, logu_min=-4, logu_max=2.3, unum=100, check_p_norm=True,
+                 p_of_z=True, exclusion_model=None, exclusion_params=None, **kwargs):
+        """
+        __init__ : NoneType, NoneType, float, float, int, bool, float, float, int, float, float, int, bool,
+                   bool, NoneType, NoneType, any -> AngularCrossCF
+            Defines the attributes of the AngularCrossCF class.
 
-    def __init__(
-        self,
-        p1=None,
-        p2=None,
-        theta_min=1e-3 * np.pi / 180.0,
-        theta_max=np.pi / 180.0,
-        theta_num=30,
-        theta_log=True,
-        zmin=0.2,
-        zmax=0.4,
-        znum=100,
-        logu_min=-4,
-        logu_max=2.3,
-        unum=100,
-        check_p_norm=True,
-        p_of_z=True,
-        exclusion_model=None,
-        exclusion_params=None,
-        **kwargs
-    ):
+        p1 : callable, optional
+            The redshift distribution of the sample. This needs not be normalised to 1, as this will occur internally. May
+            be either a function of radial distance [Mpc/h] or redshift. If a function of radial distance, `p_of_z` must be
+            set to False. Default is a flat distribution in redshift.
+
+        p2 : callable, optional
+            See `p1`. This can optionally be a different function against which to cross-correlate. By default is
+            equivalent to `p1`.
+
+        theta_min, theta_max : float, optional
+            min,max angular separations [Rad]
+
+        theta_num : int, optional
+            Number of steps in angular separation
+
+        theta_log : bool, optional
+            Whether to use logspace for theta values
+
+        zmin, zmax : float, optional
+            The redshift limits of the sample distribution. Note that this is in redshit, regardless of the value of
+            `p_of_z`.
+
+        znum : int, optional
+            Number of steps in redshift grid.
+
+        logu_min, logu_max : float, optional
+            min, max of the log10 of radial separation grid [Mpc/h]. Must be large enough to let the integral over the 3D
+            correlation function to converge.
+
+        unum : int, optional
+            Number of steps in the u grid.
+
+        check_p_norm : bool, optional
+            If False, cancels checking the normalisation of `p1` and `p2`.
+
+        p_of_z : bool, optional
+            Whether `p1` and `p2` are functions of redshift.
+
+        kwargs : unpacked-dict
+            Any keyword arguments passed down to :class:`halomod.HaloModel`.
+        """
         super(AngularCrossCF, self).__init__(**kwargs)
 
         if self.halo_model_1.z < zmin or self.halo_model_1.z > zmax:
@@ -191,17 +176,23 @@ class AngularCrossCF(CrossCorrelations):
 
     @cached_quantity
     def uvec(self):
-        """Radial separation grid [Mpc/h]."""
+        """
+        Radial separation grid [Mpc/h].
+        """
         return np.logspace(self.logu_min, self.logu_max, self.unum)
 
     @cached_quantity
     def xvec(self):
-        """Radial distance grid (corresponds to zvec) [Mpc/h]."""
+        """
+        Radial distance grid (corresponds to zvec) [Mpc/h].
+        """
         return self.cosmo.comoving_distance(self.zvec).value
 
     @cached_quantity
     def theta(self):
-        """Angular separations, [Rad]."""
+        """
+        Angular separations, [Rad].
+        """
         if self.theta_min > self.theta_max:
             raise ValueError("theta_min must be less than theta_max")
 
@@ -214,7 +205,9 @@ class AngularCrossCF(CrossCorrelations):
 
     @cached_quantity
     def r(self):
-        """Physical separation grid [Mpc/h]."""
+        """
+        Physical separation grid [Mpc/h].
+        """
         rmin = np.sqrt(
             (10 ** self.logu_min) ** 2 + self.theta.min() ** 2 * self.xvec.min() ** 2
         )
@@ -225,8 +218,8 @@ class AngularCrossCF(CrossCorrelations):
 
     @cached_quantity
     def angular_corr_gal(self):
-        """The angular correlation function w(theta).
-        From Blake+08, Eq. 33
+        """
+        The angular correlation function w(theta) from Blake+08, Eq. 33.
         """
 
         def xi(r):
@@ -256,13 +249,41 @@ class AngularCrossCF(CrossCorrelations):
 # Class for cross-correlated HODs
 class CrossHOD(AngularCrossCF):
     """
-    Docstring goes here
+    Class for constructing an HOD model for the cross-correlation of the galaxies observed at a redshift of
+    z ~ 0.5 in the BOSS-CMASS and WISE galaxy surveys.
     """
     # Initialize class
     def __init__(self, cmass_redshift_file, wise_redshift_file, data_file, covariance_file, params_file, cross_hod_model,
                  diag_cov=False, exclusion_model=None, exclusion_params=None):
         """
-        Docstring goes here
+        __init__ : self, str, str, str, str, str, AngularCrossCF, bool, NoneType, NoneType -> CrossHOD
+            Defines the attributes of the CrossHOD class.
+
+        cmass_redshift_file : str
+            String representation of the path to the .txt BOSS-CMASS redshift distribution file.
+
+        wise_redshift_file : str
+            String representation of the path to the .txt WISE redshift distribution file.
+
+        data_file : str
+            String representation of the path to the .txt file containing the CMASS autocorrelation and CMASS-WISE
+            cross-correlation data as functions of R.
+
+        covariance_file : str
+            String representation of the path to the .txt file containing the covariance matrix describing the
+            CMASS autocorrelation and CMASS-WISE cross-correlation.
+
+        params_file : str
+            String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
+            WISE HOD models.
+
+        cross_hod_model : AngularCrossCF
+            Cross-correlated HOD model provided by an instance of the AngularCrossCF class.
+
+        diag_cov : bool
+            Optional argument that determines whether the full covariance matrix is used, or only the diagonal
+            entries of the covariance matrix are used.
+            Default value is False.
         """
         # Initializing redshift distributions
         self.cmass_redshift_file = cmass_redshift_file
@@ -411,7 +432,7 @@ class CrossHOD(AngularCrossCF):
     # Print representation
     def __str__(self):
         """
-        __str__ : Self -> Str
+        __str__ : self -> str
             Provides a string representation of a given instance of the CrossHOD class.
         """
         rep_str = '-'*80
@@ -435,12 +456,12 @@ class CrossHOD(AngularCrossCF):
     # Class equivalence
     def __eq__(self, other):
         """
-        __eq__ : Self, Any -> Bool
+        __eq__ : self, any -> bool
             Allows for the comparison of an instance of the CrossHOD class to another object.
             Returns True if both are instances of the CrossHOD class with identical properties, and
             False otherwise.
 
-        other : Any
+        other : any
             Any object against which a given instance of the CrossHOD class is compared.
         """
         return isinstance(other, CrossHOD) and (self.summary == other.summary)
@@ -448,8 +469,8 @@ class CrossHOD(AngularCrossCF):
     # CMASS angular autocorrelation
     def corr_cmass_auto(self):
         """
-        corr_cmass_auto : Self -> Array-like
-            Executes Halomod's angular_corr_gal method to compute the angular autocorrelation of the first HOD model.
+        corr_cmass_auto : self -> array-like
+            Executes Halomod's angular_corr_gal method to compute the angular autocorrelation of the CMASS HOD model.
         """
         #corr auto tracer
         cmass_auto = self.cmass_auto
@@ -458,8 +479,8 @@ class CrossHOD(AngularCrossCF):
     # WISE angular autocorrelation
     def corr_wise_auto(self):
         """
-        corr_wise_auto : Self -> Array-like
-            Executes Halomod's angular_corr_gal method to compute the angular autocorrelation of the first HOD model.
+        corr_wise_auto : self -> array-like
+            Executes Halomod's angular_corr_gal method to compute the angular autocorrelation of the WISE HOD model.
         """
         #corr auto tracer
         wise_auto = self.wise_auto
@@ -468,19 +489,65 @@ class CrossHOD(AngularCrossCF):
     # CMASS-WISE angular cross-correlation
     def corr_cross(self):
         """
-        corr_cross : Self -> Array-like
-            Executes Halomod's angular_corr_gal method to compute the angular cross-correlation of the two HOD models.
+        corr_cross : self -> array-like
+            Executes Halomod's angular_corr_gal method to compute the angular cross-correlation of the CMASS and
+            WISE HOD models.
         """
         cross = self.cross
         return cross.angular_corr_gal
 
-    # CMASS angular autocorrelation log-likelihood
-    def cmass_auto_likelihood(self, cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm):
+    # Total model log-likelihood
+    def likelihood(self, cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
+                   wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc):
         """
-        Docstring goes here
+        likelihood : self, float, float, float, float, float, float, float, float, float, float, float
+                     float, float -> float
+            Computes the log-likelihood that an HOD model for the CMASS and WISE galaxies with the given parameters
+            matches the data.
+
+        cmass_M_min : float
+            The minimum halo mass necessary for a CMASS dark matter halo to host a central galaxy.
+
+        cmass_M_1 : float
+            A mass parameter for CMASS satellite galaxies.
+
+        cmass_alpha : float
+            The exponent of the galaxy mass power law for CMASS galaxies.
+
+        cmass_M_0 : float
+            A mass paramter for CMASS satellite galaxies.
+
+        cmass_sig_logm : float
+            The step function smoothing parameter for CMASS dark matter halos.
+
+        wise_M_min : float
+            The minimum halo mass necessary for a WISE dark matter halo to host a central galaxy.
+
+        wise_M_1 : float
+            A mass parameter for WISE satellite galaxies.
+
+        wise_alpha : float
+            The exponent of the galaxy mass power law for WISE galaxies.
+
+        wise_M_0 : float
+            A mass paramter for WISE satellite galaxies.
+
+        wise_sig_logm : float
+            The step function smoothing parameter for WISE dark matter halos.
+
+        R_ss : float
+            The satellite-satellite correlation parameter for CMASS and WISE galaxies.
+
+        R_cs : float
+            The central-satellite correlation parameter for CMASS and WISE galaxies.
+
+        R_sc : float
+            The satellite-central correlation parameter for CMASS and WISE galaxies.
         """
         cmass_data = self.data[:,1]
-        cmass_cov = self.covariance[:10,:10]
+        cross_data = self.data[:,2]
+        total_data = np.concatenate((cmass_data, cross_data))
+        cov = self.covariance
 
         cmass_auto = self.cmass_auto
         cmass_auto.hod_params.update(
@@ -493,19 +560,6 @@ class CrossHOD(AngularCrossCF):
             }
         )
         cmass_auto_corr = cmass_auto.angular_corr_gal
-        cmass_auto_chisq = np.linalg.multi_dot([cmass_data - cmass_auto_corr, np.linalg.inv(cmass_cov), cmass_data - cmass_auto_corr])
-        cmass_auto_loglike = -0.5 * cmass_auto_chisq
-
-        return cmass_auto_loglike
-
-    # CMASS-WISE angular cross-correlation log-likelihood
-    def cross_likelihood(self, cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
-                         wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc):
-        """
-        Docstring goes here
-        """
-        cross_data = self.data[:,2]
-        cross_cov = self.covariance[10:,10:]
 
         cross = self.cross
         cross.halo_model_1.update(
@@ -527,32 +581,24 @@ class CrossHOD(AngularCrossCF):
             }
         )
         cross_corr = cross.angular_corr_gal
-        cross_chisq = np.linalg.multi_dot([cross_data - cross_corr, np.linalg.inv(cross_cov), cross_data - cross_corr])
-        cross_loglike = -0.5 * cross_chisq
 
-        return cross_loglike
+        total_corr = np.concatenate((cmass_auto_corr, cross_corr))
+        total_chisq = np.linalg.multi_dot([total_data - total_corr, np.linalg.inv(cov), total_data - total_corr])
+        total_loglike = -0.5 * total_chisq
 
-    # Total model log-likelihood
-    def likelihood(self, cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
-                   wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc):
-        """
-        Docstring goes here
-        """
-        cmass_auto_loglike = self.cmass_auto_likelihood(cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm)
-        cross_loglike = self.cross_likelihood(cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
-                                              wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc)
-
-        return cmass_auto_loglike + cross_loglike
+        return total_loglike
 
     # Total model log-likelihood with number density weighting
     def nbar_likelihood(self, cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
                         wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc):
         """
-        Docstring goes here
+        nbar_likelihood : self, float, float, float, float, float, float, float, float, float, float, float
+                          float, float -> float
+            Computes the log-likelihood that an HOD model for the CMASS and WISE galaxies with the given parameters
+            matches the data, using the CMASS and WISE galaxy number densities as an additional constraint.
+
+        Parameters are the same as likelihood.
         """
-        cmass_auto_loglike = self.cmass_auto_likelihood(cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm)
-        cross_loglike = self.cross_likelihood(cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
-                                              wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc)
         sig_nbar = 0.1
 
         cmass_nbar_data = self.model_params['nbar']['CMASS']
@@ -563,9 +609,9 @@ class CrossHOD(AngularCrossCF):
         wise_nbar_model = self.cross.halo_model_2.mean_tracer_den 
         wise_nbar_correction = -0.5 * ((wise_nbar_data - wise_nbar_model)/(sig_nbar * wise_nbar_data))**2
 
-        cmass_auto_loglike += cmass_nbar_correction
-        cross_loglike += wise_nbar_correction
+        loglike = self.likelihood(cmass_M_min, cmass_M_1, cmass_alpha, cmass_M_0, cmass_sig_logm,
+                                  wise_M_min, wise_M_1, wise_alpha, wise_M_0, wise_sig_logm, R_ss, R_cs, R_sc)
 
-        return cmass_auto_loglike + cross_loglike
-
+        return loglike + cmass_nbar_correction + wise_nbar_correction
+ 
 # ----------------------------------------------------------------------------------------------------------------------
