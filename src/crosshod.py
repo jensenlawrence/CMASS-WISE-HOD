@@ -324,7 +324,7 @@ class CrossHOD(AngularCrossCF):
 
         # Calculating distances and theta values
         distance = Planck15.comoving_distance(z).value * Planck15.H0.value/100.0
-        thetas = self.data[:,0]/distance
+        thetas = self.data[7:,0]/distance
         self.thetas = thetas
 
         # CMASS redshift calculations
@@ -366,9 +366,9 @@ class CrossHOD(AngularCrossCF):
         # CMASS angular autocorrelation computation
         self.cmass_auto = AngularCF(
             p1 = cmass_zfunc,
-            theta_min = np.min(thetas),
-            theta_max = np.max(thetas),
-            theta_num = len(thetas),
+            theta_min = np.min(thetas[3:]),
+            theta_max = np.max(thetas[3:]),
+            theta_num = len(thetas[3:]),
             theta_log = True,
             p_of_z = False,
             zmin = zmin,
@@ -376,26 +376,6 @@ class CrossHOD(AngularCrossCF):
             check_p_norm = False,
             hod_model = 'Zheng05',
             hod_params = cmass_model['hod_params'],
-            logu_min = -5,
-            logu_max = 2.2,
-            unum = 500,
-            exclusion_model = exclusion_model,
-            exclusion_params = exclusion_params
-        )
-
-        # WISE angular autocorrelation computation
-        self.wise_auto = AngularCF(
-            p1 = wise_zfunc,
-            theta_min = np.min(thetas),
-            theta_max = np.max(thetas),
-            theta_num = len(thetas),
-            theta_log = True,
-            p_of_z = False,
-            zmin = zmin,
-            zmax = zmax,
-            check_p_norm = False,
-            hod_model = 'Zheng05',
-            hod_params = wise_model['hod_params'],
             logu_min = -5,
             logu_max = 2.2,
             unum = 500,
@@ -475,16 +455,6 @@ class CrossHOD(AngularCrossCF):
         #corr auto tracer
         cmass_auto = self.cmass_auto
         return cmass_auto.angular_corr_gal
-
-    # WISE angular autocorrelation
-    def corr_wise_auto(self):
-        """
-        corr_wise_auto : self -> array-like
-            Executes Halomod's angular_corr_gal method to compute the angular autocorrelation of the WISE HOD model.
-        """
-        #corr auto tracer
-        wise_auto = self.wise_auto
-        return wise_auto.angular_corr_gal
     
     # CMASS-WISE angular cross-correlation
     def corr_cross(self):
@@ -544,9 +514,7 @@ class CrossHOD(AngularCrossCF):
         R_sc : float
             The satellite-central correlation parameter for CMASS and WISE galaxies.
         """
-        cmass_data = self.data[:,1]
-        cross_data = self.data[:,2]
-        total_data = np.concatenate((cmass_data, cross_data))
+        data = self.data[:,1]
         cov = self.covariance
 
         cmass_auto = self.cmass_auto
@@ -583,7 +551,7 @@ class CrossHOD(AngularCrossCF):
         cross_corr = cross.angular_corr_gal
 
         total_corr = np.concatenate((cmass_auto_corr, cross_corr))
-        total_chisq = np.linalg.multi_dot([total_data - total_corr, np.linalg.inv(cov), total_data - total_corr])
+        total_chisq = np.linalg.multi_dot([data - total_corr, np.linalg.inv(cov), data - total_corr])
         total_loglike = -0.5 * total_chisq
 
         return total_loglike

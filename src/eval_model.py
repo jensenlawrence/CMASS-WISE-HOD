@@ -5,6 +5,7 @@
 from cobaya.model import get_model
 from cobaya.run import run
 import numpy as np
+from itertools import product 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Model Optimization
@@ -114,127 +115,107 @@ def cobaya_mcmc(model_variations, likelihood_func, packages_path, output='', deb
     return run(info)
 
 # ----------------------------------------------------------------------------------------------------------------------
-# CMASS Parameters Grid Search
+# CMASS-WISE Parameters Grid Search
 # ----------------------------------------------------------------------------------------------------------------------
 
-# The gridsearch function
-def grid_search(likelihood_func, output, cmass_M_mins, cmass_M_1s, cmass_alphas, cmass_M_0s, cmass_sig_logms,
-                wise_M_mins, wise_M_1s, wise_alphas, wise_M_0s, wise_sig_logms, R_ss, R_cs, R_sc):
+# Getting grid search parameter ranges
+def get_gridsearch_range(params, key, param):
     """
-    grid_search : function, str, array-like, array-like, array-like, array-like, array-like, array-like, array-like,
-                  array-like, array-like, array-like, array-like, array-like, float, float, float -> NoneType
-        Executes a grid search on the provided parameter space to determine the maximum log-likelihood of
-        likelihood_func.
-
-    likelihood_func : function : floats -> float
-        User-defined function for computing log-likelihoods.
-        Returns a log-likelihood as a float.
-
-    output : str
-        Optional argument that sets the path to where the grid search results are saved.
-        Default value is ''.
-
-    cmass_M_min : float
-        The minimum halo mass necessary for a CMASS dark matter halo to host a central galaxy.
-
-    cmass_M_1 : float
-        A mass parameter for CMASS satellite galaxies.
-
-    cmass_alpha : float
-        The exponent of the galaxy mass power law for CMASS galaxies.
-
-    cmass_M_0 : float
-        A mass paramter for CMASS satellite galaxies.
-
-    cmass_sig_logm : float
-        The step function smoothing parameter for CMASS dark matter halos.
-
-    wise_M_min : float
-        The minimum halo mass necessary for a WISE dark matter halo to host a central galaxy.
-
-    wise_M_1 : float
-        A mass parameter for WISE satellite galaxies.
-
-    wise_alpha : float
-        The exponent of the galaxy mass power law for WISE galaxies.
-
-    wise_M_0 : float
-        A mass paramter for WISE satellite galaxies.
-
-    wise_sig_logm : float
-        The step function smoothing parameter for WISE dark matter halos.
-
-    R_ss : float
-        The satellite-satellite correlation parameter for CMASS and WISE galaxies.
-
-    R_cs : float
-        The central-satellite correlation parameter for CMASS and WISE galaxies.
-
-    R_sc : float
-        The satellite-central correlation parameter for CMASS and WISE galaxies.
+    Docstring goes here
     """
+    if params[key][param]['sample']:
+        param_vals = np.linspace(
+            params[key][param]['sample_min'],
+            params[key][param]['sample_max'],
+            params[key][param]['sample_div']
+        )
+    else:
+        param_vals = [params[key][param]['val']]
 
-    idx_dict = {
-        'M_min': 0,
-        'M_1': 1,
-        'alpha': 2,
-        'M_0': 3,
-        'sig_logm': 4
-    }
+    return param_vals
 
-    counter = 0
-    best_loglike = -10000
-    best_cmass = np.zeros(len(idx_dict))
-    best_wise = np.zeros(len(idx_dict))
+# Executing grid search
+def gridsearch(params, likelihood_func, output):
+    """
+    Docstring goes here
+    """
+    cmass_M_min_vals = get_gridsearch_range(params, 'CMASS HOD', 'M_min')
+    cmass_M_1_vals = get_gridsearch_range(params, 'CMASS HOD', 'M_1')
+    cmass_alpha_vals = get_gridsearch_range(params, 'CMASS HOD', 'alpha')
+    cmass_M_0_vals = get_gridsearch_range(params, 'CMASS HOD', 'M_0')
+    cmass_sig_logm_vals = get_gridsearch_range(params, 'CMASS HOD', 'sig_logm')
+    wise_M_min_vals = get_gridsearch_range(params, 'WISE HOD', 'M_min')
+    wise_M_1_vals = get_gridsearch_range(params, 'WISE HOD', 'M_1')
+    wise_alpha_vals = get_gridsearch_range(params, 'WISE HOD', 'alpha')
+    wise_M_0_vals = get_gridsearch_range(params, 'WISE HOD', 'M_0')
+    wise_sig_logm_vals = get_gridsearch_range(params, 'WISE HOD', 'sig_logm')
+    R_ss = params['galaxy_corr']['R_ss']['val']
+    R_cs = params['galaxy_corr']['R_cs']['val']
+    R_sc = params['galaxy_corr']['R_sc']['val']
 
-    for cmass_M_min in cmass_M_mins:
-        for cmass_M_1 in cmass_M_1s:
-            for cmass_alpha in cmass_alphas:
-                for cmass_M_0 in cmass_M_0s:
-                    for cmass_sig_logm in cmass_sig_logms:
-                        for wise_M_min in wise_M_mins:
-                            for wise_M_1 in wise_M_1s:
-                                for wise_alpha in wise_alphas:
-                                    for wise_M_0 in wise_M_0s:
-                                        for wise_sig_logm in wise_sig_logms:
+    print('CMASS')
+    print(f'M_min = {cmass_M_min_vals}')
+    print(f'M_1 = {cmass_M_1_vals}')
+    print(f'alpha = {cmass_alpha_vals}')
+    print(f'M_0 = {cmass_M_0_vals}')
+    print(f'sig_logm = {cmass_sig_logm_vals}')
+    print('\n')
+    print('WISE')
+    print(f'M_min = {wise_M_min_vals}')
+    print(f'M_1 = {wise_M_1_vals}')
+    print(f'alpha = {wise_alpha_vals}')
+    print(f'M_0 = {wise_M_0_vals}')
+    print(f'sig_logm = {wise_sig_logm_vals}')
+    print('\n')
 
-                                            counter += 1
+    param_combos = product(
+        cmass_M_min_vals,
+        cmass_M_1_vals,
+        cmass_alpha_vals,
+        cmass_M_0_vals,
+        cmass_sig_logm_vals,
+        wise_M_min_vals,
+        wise_M_1_vals,
+        wise_alpha_vals,
+        wise_M_0_vals,
+        wise_sig_logm_vals
+    )
 
-                                            loglike = likelihood_func(
-                                                cmass_M_min = cmass_M_min,
-                                                cmass_M_1 = cmass_M_1,
-                                                cmass_alpha = cmass_alpha,
-                                                cmass_M_0 = cmass_M_0,
-                                                cmass_sig_logm = cmass_sig_logm,
-                                                wise_M_min = wise_M_min,
-                                                wise_M_1 = wise_M_1,
-                                                wise_alpha = wise_alpha,
-                                                wise_M_0 = wise_M_0,
-                                                wise_sig_logm = wise_sig_logm,
-                                                R_ss = R_ss,
-                                                R_cs = R_cs,
-                                                R_sc = R_sc
-                                            )
+    counter = 1
+    best_loglike = -1e6
+    best_cmass = []
+    best_wise = []
 
-                                            if loglike > best_loglike:
-                                                best_loglike = loglike
-                                                best_cmass[idx_dict['M_min']] = cmass_M_min
-                                                best_cmass[idx_dict['M_1']] = cmass_M_1
-                                                best_cmass[idx_dict['alpha']] = cmass_alpha
-                                                best_cmass[idx_dict['M_0']] = cmass_M_0
-                                                best_cmass[idx_dict['sig_logm']] = cmass_sig_logm
-                                                best_wise[idx_dict['M_min']] = wise_M_min
-                                                best_wise[idx_dict['M_1']] = wise_M_1
-                                                best_wise[idx_dict['alpha']] = wise_alpha
-                                                best_wise[idx_dict['M_0']] = wise_M_0
-                                                best_wise[idx_dict['sig_logm']] = wise_sig_logm
+    for combo in param_combos:
+        loglike = likelihood_func(
+            cmass_M_min = combo[0],
+            cmass_M_1 = combo[1],
+            cmass_alpha = combo[2],
+            cmass_M_0 = combo[3],
+            cmass_sig_logm = combo[4],
+            wise_M_min = combo[5],
+            wise_M_1 = combo[6],
+            wise_alpha = combo[7],
+            wise_M_0 = combo[8],
+            wise_sig_logm = combo[9],
+            R_ss = R_ss,
+            R_cs = R_cs,
+            R_sc = R_sc
+        )
 
-                                                print('\n')
-                                                print(f'STEP {counter}')
-                                                print(f'New best log-likelihood: {best_loglike}')
-                                                print(f'CMASS parameters: {best_cmass}')
-                                                print(f'WISE parameters: {best_wise}')
-                                                print('\n')
+        if loglike > best_loglike:
+            best_loglike = loglike 
+            best_cmass = combo[:5]
+            best_wise = combo[5:]
+
+            print('\n')
+            print(f'STEP {counter}')
+            print(f'New best log-likelihood: {best_loglike}')
+            print(f'CMASS parameters: {best_cmass}')
+            print(f'WISE parameters: {best_wise}')
+            print('\n')
+
+        counter += 1
 
     print('-'*80)
     print('GRID SEARCH COMPLETE')
@@ -248,18 +229,18 @@ def grid_search(likelihood_func, output, cmass_M_mins, cmass_M_1s, cmass_alphas,
     output_file.write(f'Chi^2 = {-2 * best_loglike}\n')
     output_file.write('\n')
     output_file.write('CMASS Parameters\n')
-    output_file.write(f'M_min = {best_cmass[idx_dict["M_min"]]}\n')
-    output_file.write(f'M_1 = {best_cmass[idx_dict["M_1"]]}\n')
-    output_file.write(f'alpha = {best_cmass[idx_dict["alpha"]]}\n')
-    output_file.write(f'M_0 = {best_cmass[idx_dict["M_0"]]}\n')
-    output_file.write(f'sig_logm = {best_cmass[idx_dict["sig_logm"]]}\n')
+    output_file.write(f'M_min = {best_cmass[0]}\n')
+    output_file.write(f'M_1 = {best_cmass[1]}\n')
+    output_file.write(f'alpha = {best_cmass[2]}\n')
+    output_file.write(f'M_0 = {best_cmass[3]}\n')
+    output_file.write(f'sig_logm = {best_cmass[4]}\n')
     output_file.write('\n')
     output_file.write('WISE Parameters\n')
-    output_file.write(f'M_min = {best_wise[idx_dict["M_min"]]}\n')
-    output_file.write(f'M_1 = {best_wise[idx_dict["M_1"]]}\n')
-    output_file.write(f'alpha = {best_wise[idx_dict["alpha"]]}\n')
-    output_file.write(f'M_0 = {best_wise[idx_dict["M_0"]]}\n')
-    output_file.write(f'sig_logm = {best_wise[idx_dict["sig_logm"]]}\n')
+    output_file.write(f'M_min = {best_wise[0]}\n')
+    output_file.write(f'M_1 = {best_wise[1]}\n')
+    output_file.write(f'alpha = {best_wise[2]}\n')
+    output_file.write(f'M_0 = {best_wise[3]}\n')
+    output_file.write(f'sig_logm = {best_wise[4]}\n')
     output_file.close()
 
 # ----------------------------------------------------------------------------------------------------------------------
