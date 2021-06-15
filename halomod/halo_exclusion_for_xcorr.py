@@ -1,0 +1,569 @@
+"""
+Module defining halo model components for halo exclusion.
+"""
+import numpy as np
+from hmf import Component
+from cached_property import cached_property
+from scipy import integrate as intg
+import warnings
+
+try:
+    from numba import jit
+
+    USE_NUMBA = True
+except ImportError:  # pragma: no cover
+    USE_NUMBA = False
+    warnings.warn(
+        "Warning: Some Halo-Exclusion models have significant speedup when using Numba"
+    )
+
+
+# ===============================================================================
+# UTILITIES
+# ===============================================================================
+def outer(a, b):
+    r"""
+    Calculate the outer product of two vectors.
+    """
+    return np.outer(a, b).reshape(a.shape + b.shape)
+
+
+def dbltrapz(X, dx, dy=None):
+    """
+    Double-integral over the last two dimensions of X using trapezoidal rule.
+    """
+    dy = dy or dx
+    out = X.copy()
+    out[..., 1:-1, :] *= 2
+    out[..., :, 1:-1] *= 2
+    return dx * dy * np.sum(out, axis=(-2, -1)) / 4.0
+
+
+def makeW(nx, ny):
+    r"""
+    Return a window matrix for double-intergral.
+    """
+    W = np.ones((nx, ny))
+    W[1 : nx - 1 : 2, :] *= 4
+    W[:, 1 : ny - 1 : 2] *= 4
+    W[2 : nx - 1 : 2, :] *= 2
+    W[:, 2 : ny - 1 : 2] *= 2
+    return W
+
+
+if USE_NUMBA:
+
+    @jit(nopython=True)
+    def dblsimps_(X, dx, dy):  # pragma: no cover
+        """
+        Double-integral of X **FOR SYMMETRIC FUNCTIONS**.
+        """
+        nx = X.shape[-2]
+        ny = X.shape[-1]
+
+        # Must be odd number
+        # if nx % 2 == 0:
+        # nx -= 1
+        # if ny % 2 == 0:
+        # ny -= 1
+
+        W = makeW_(nx, ny)  # only upper
+
+        tot = np.zeros_like(X[..., 0, 0])
+        for ix in range(nx):
+            tot += W[ix, ix] * X[..., ix, ix]
+            for iy in range(ix + 1, ny):
+                tot += 2 * W[ix, iy] * X[..., ix, iy]
+
+        return dx * dy * tot / 9.0
+
+    @jit(nopython=True)
+    def makeW_(nx, ny):  # pragma: no cover
+        r"""
+        Return a window matrix for symmetric double-intergral.
+        """
+        W = np.ones((nx, ny))
+        if nx % 2 == 0:
+            for ix in range(1, nx - 2, 2):
+                W[ix, -1] *= 4
+                W[-1, ix] *= 4
+                for iy in range(ny - 1):
+                    W[ix, iy] *= 4
+                    W[iy, ix] *= 4
+
+            for ix in range(2, nx - 2, 2):
+                W[ix, -1] *= 2
+                W[-1, ix] *= 2
+                for iy in range(ny - 1):
+                    W[ix, iy] *= 2
+                    W[iy, ix] *= 2
+
+            for ix in range(nx):
+                W[ix, -2] *= 2.5
+                W[ix, -1] *= 1.5
+                W[-2, ix] *= 2.5
+                W[-1, ix] *= 1.5
+        else:
+            for ix in range(1, nx - 1, 2):
+                for iy in range(ny):
+                    W[ix, iy] *= 4
+                    W[iy, ix] *= 4
+
+            for ix in range(2, nx - 1, 2):
+                for iy in range(ny):
+                    W[ix, iy] *= 2
+                    W[iy, ix] *= 2
+
+        return W
+
+    @jit(nopython=True)
+    def makeH_(nx, ny):  # pragma: no cover
+        """
+        Return the window matrix for trapezoidal intergral.
+        """
+        H = np.ones((nx, ny))
+        for ix in range(1, nx - 1):
+            for iy in range(ny):
+                H[ix, iy] *= 2
+                H[iy, ix] *= 2
+
+        return H
+
+    @jit(nopython=True)
+    def dbltrapz_(X, dx, dy):  # pragma: no cover
+        """
+        Double-integral of X for the trapezoidal method.
+        """
+        nx = X.shape[-2]
+        ny = X.shape[-1]
+
+        H = makeH_(nx, ny)
+        tot = np.zeros_like(X[..., 0, 0])
+        for ix in range(nx):
+            tot += H[ix, ix] * X[ix, ix]
+            for iy in range(ix + 1, ny):
+                tot += 2 * H[ix, iy] * X[ix, iy]
+
+        return dx * dy * tot / 4.0
+
+
+# ===============================================================================
+# Halo-Exclusion Models
+# ===============================================================================
+class Exclusion(Component):
+    """
+    Base class for exclusion models.
+
+    All models will need to perform single or double integrals over
+    arrays that may have an extra two dimensions. The maximum possible
+    size is k*r*m*m, which for normal values of the vectors equates to
+    ~ 1000*50*500*500 = 12,500,000,000 values, which in 64-bit reals is
+    1e11 bytes = 100GB. We thus limit this to a maximum of either k*r*m
+    or r*m*m, both of which should be less than a GB of memory.
+
+    It is possibly better to limit it to k*r or m*m, which should be quite
+    memory efficient, but then without accelerators (ie. Numba), these
+    will be very slow.
+    """
+
+    def __init__(self, m1, m2, density1, density2, Ifunc1, Ifunc2, bias1, bias2, r, delta_halo, mean_density):
+        self.density1 = density1  # 1d, (m)
+        self.density2 = density2
+        self.m1 = m1  # 1d, (m)
+        self.m2 = m2
+        self.Ifunc1 = Ifunc1  # 2d, (k,m)
+        self.Ifunc2 = Ifunc2
+        self.bias1 = bias1  # 1d (m) or 2d (r,m)
+        self.bias2 = bias2
+        self.r = r  # 1d (r)
+
+        self.mean_density = mean_density
+        self.delta_halo = delta_halo
+        self.dlnx = np.log(m1[1] / m1[0])
+        
+        
+    def raw_integrand1(self):
+        """
+        Return either a 2d (k,m) or 3d (r,k,m) array with the general integrand.
+        """
+        if self.bias1.ndim == 1:
+            # *m since integrating in logspace
+            return outer(np.ones_like(self.r), self.Ifunc1 * self.bias1 * self.m1)
+        else:
+            return np.einsum("ij,kj->kij", self.Ifunc1 * self.m1, self.bias1)
+            
+    def raw_integrand2(self):
+        """
+        Return either a 2d (k,m) or 3d (r,k,m) array with the general integrand.
+        """
+        if self.bias2.ndim == 1:
+            # *m since integrating in logspace
+            return outer(np.ones_like(self.r), self.Ifunc2 * self.bias2 * self.m2)
+        else:
+            return np.einsum("ij,kj->kij", self.Ifunc2 * self.m2, self.bias2)
+            
+    def integrate(self):
+        """
+        Integrate the :meth:`raw_integrand` over mass.
+        This should pass back whatever is multiplied by P_m(k) to get the two-halo
+        term. Often this will be a square of an integral, sometimes a Double-integral.
+        """
+        pass
+
+
+class NoExclusion(Exclusion):
+    r"""
+    A model where there's no halo exclusion.
+    """
+
+    def integrate(self):
+        """Integrate the :meth:`raw_integrand` over mass."""
+        return intg.simps(self.raw_integrand1(), dx=self.dlnx) * intg.simps(self.raw_integrand2(), dx=self.dlnx)
+
+class DblEllipsoid(Exclusion):
+    r"""
+    Double Ellipsoid model of halo exclusion.
+    Assuming a lognormal distribution
+    of ellipticities for halos, the probability of halo pairs **not** excluded
+    is:
+    .. math:: P(y) = 3 y^2 - 2 y^3 ,\; y = (x-0.8)/0.29,\; x = r/(R_{\rm vir,1}+R_{\rm vir,2})
+    taken from [1]_.
+    References
+    ----------
+    .. [1]  Tinker, J. et al., " On the Mass-to-Light Ratio of Large-Scale Structure",
+            https://ui.adsabs.harvard.edu/abs/2005ApJ...631...41T.
+    @cached_property
+    def mask(self):
+        "Unecessary for this approach."
+        return None
+    """
+    @property
+    def r_halo1(self):
+        """The virial radius of the halo"""
+        return (3 * self.m1 / (4 * np.pi * self.delta_halo * self.mean_density)) ** (
+            1.0 / 3.0
+        )
+    @property
+    def r_halo2(self):
+        """The virial radius of the halo"""
+        return (3 * self.m2 / (4 * np.pi * self.delta_halo * self.mean_density)) ** (
+            1.0 / 3.0
+        )
+
+
+    @cached_property
+    def prob(self):
+        """
+        The probablity distribution used in calculating double integral.
+        """
+        x = outer(self.r, 1 / np.add.outer(self.r_halo1, self.r_halo2))
+        x = (x - 0.8) / 0.29  # this is y but we re-use the memory
+        np.clip(x, 0, 1, x)
+        return 3 * x ** 2 - 2 * x ** 3
+        
+    @cached_property
+    def prob11(self):
+        """
+        The probablity distribution used in calculating double integral.
+        """
+        x = outer(self.r, 1 / np.add.outer(self.r_halo1, self.r_halo1))
+        x = (x - 0.8) / 0.29  # this is y but we re-use the memory
+        np.clip(x, 0, 1, x)
+        return 3 * x ** 2 - 2 * x ** 3
+
+    @cached_property
+    def prob22(self):
+        """
+        The probablity distribution used in calculating double integral.
+        """
+        x = outer(self.r, 1 / np.add.outer(self.r_halo2, self.r_halo2))
+        x = (x - 0.8) / 0.29  # this is y but we re-use the memory
+        np.clip(x, 0, 1, x)
+        return 3 * x ** 2 - 2 * x ** 3
+
+        
+    @cached_property
+    def density_mod(self):
+        """The modified density, under new limits."""
+        integrand = self.prob * outer(
+            np.ones_like(self.r), np.outer(self.density1 * self.m1, self.density2 * self.m2)
+        )
+        return np.sqrt(dbltrapz(integrand, self.dlnx))
+        
+    @cached_property
+    def density_mod1(self):
+        """The modified density, under new limits."""
+        integrand = self.prob11 * outer(
+            np.ones_like(self.r), np.outer(self.density1 * self.m1, self.density1 * self.m1)
+        )
+        return np.sqrt(dbltrapz(integrand, self.dlnx))
+        
+    @cached_property
+    def density_mod2(self):
+        """The modified density, under new limits."""
+        integrand = self.prob22 * outer(
+            np.ones_like(self.r), np.outer(self.density2 * self.m2, self.density2 * self.m2)
+        )
+        return np.sqrt(dbltrapz(integrand, self.dlnx))
+
+        
+    def integrate(self):
+        """
+        Integrate the :meth:`raw_integrand` over mass.
+        """
+        integ1 = self.raw_integrand1()  # (r,k,m)
+        integ2 = self.raw_integrand2()  # (r,k,m)
+        out = np.zeros_like(integ1[:, :, 0])
+
+        integrand = np.zeros_like(self.prob)
+        for ik in range(integ1.shape[1]):
+
+            for ir in range(len(self.r)):
+                integrand[ir] = self.prob[ir] * np.outer(
+                    integ1[ir, ik, :], integ2[ir, ik, :]
+                )
+            out[:, ik] = intg.simps(intg.simps(integrand, dx=self.dlnx), dx=self.dlnx)
+        return out
+
+
+if USE_NUMBA:
+
+    class DblEllipsoid_(DblEllipsoid):  # pragma: no cover
+        r"""
+        The same as :class:`DblEllipsoid`. But uses NUMBA to speed up the integration.
+        """
+        
+        @cached_property
+        def density_mod(self):  # pragma: no cover
+            """The modified density, under new limits."""
+            return density_mod_(
+                self.r,
+                self.r_halo1,
+                np.outer(self.density1 * self.m1, self.density2 * self.m2),
+                self.dlnx,
+            )
+
+        @cached_property
+        def density_mod1(self):  # pragma: no cover
+            """The modified density, under new limits."""
+            return density_mod_(
+                self.r,
+                self.r_halo1,
+                np.outer(self.density1 * self.m1, self.density1 * self.m1),
+                self.dlnx,
+            )
+            
+        @cached_property
+        def density_mod2(self):  # pragma: no cover
+            """The modified density, under new limits."""
+            return density_mod_(
+                self.r,
+                self.r_halo2,
+                np.outer(self.density2 * self.m2, self.density2 * self.m2),
+                self.dlnx,
+            )
+            
+
+        @cached_property
+        def prob(self):  # pragma: no cover
+            """
+            The probablity distribution used in calculating double integral
+            """
+            return prob_inner_(self.r, self.r_halo1)
+            
+        def integrate(self):  # pragma: no cover
+            """
+            Integrate the :meth:`raw_integrand` over mass.
+            """
+            return integrate_dblell(self.raw_integrand1(), self.raw_integrand2(), self.prob, self.dlnx)
+
+    @jit(nopython=True)
+    def integrate_dblell(integ1, integ2, prob, dx):  # pragma: no cover
+        r"""Double Integration via the trapezoidal method if using NUMBA"""
+        nr = integ.shape[0]
+        nk = integ.shape[1]
+        nm = prob.shape[1]
+
+        out = np.zeros((nr, nk))
+        integrand = np.zeros((nm, nm))
+
+        for ir in range(nr):
+            for ik in range(nk):
+                for im in range(nm):
+                    for jm in range(im, nm):
+                        integrand[im, jm] = (
+                            integ1[ir, ik, im] * integ2[ir, ik, jm] * prob[ir, im, jm]
+                        )
+                out[ir, ik] = dbltrapz_(integrand, dx, dx)
+        return out
+
+    @jit(nopython=True)
+    def density_mod_(r, rvir, densitymat, dx):  # pragma: no cover
+        """The modified density, under new limits."""
+        d = np.zeros(len(r))
+        for ir, rr in enumerate(r):
+            integrand = prob_inner_r_(rr, rvir) * densitymat
+            d[ir] = dbltrapz_(integrand, dx, dx)
+        return np.sqrt(d)
+
+    @jit(nopython=True)
+    def prob_inner_(r, rvir):  # pragma: no cover
+        """
+        Jit-compiled version of calculating prob, taking advantage of symmetry.
+        """
+        nrv = len(rvir)
+        out = np.empty((len(r), nrv, nrv))
+        for ir, rr in enumerate(r):
+            for irv, rv1 in enumerate(rvir):
+                for jrv in range(irv, nrv):
+                    rv2 = rvir[jrv]
+                    x = (rr / (rv1 + rv2) - 0.8) / 0.29
+                    if x <= 0:
+                        out[ir, irv, jrv] = 0
+                    elif x >= 1:
+                        out[ir, irv, jrv] = 1
+                    else:
+                        out[ir, irv, jrv] = 3 * x ** 2 - 2 * x ** 3
+        return out
+
+    @jit(nopython=True)
+    def prob_inner_r_(r, rvir):  # pragma: no cover
+        """
+        Jit-compiled version of calculating prob along one r,
+        taking advantage of symmetry.
+        """
+        nrv = len(rvir)
+        out = np.empty((nrv, nrv))
+        for irv, rv1 in enumerate(rvir):
+            for jrv in range(irv, nrv):
+                rv2 = rvir[jrv]
+                x = (r / (rv1 + rv2) - 0.8) / 0.29
+                if x <= 0:
+                    out[irv, jrv] = 0
+                elif x >= 1:
+                    out[irv, jrv] = 1
+                else:
+                    out[irv, jrv] = 3 * x ** 2 - 2 * x ** 3
+        return out
+
+class NgMatched(DblEllipsoid):
+    r"""
+    A model for double ellipsoid halo exclusion, where a mask is
+    defined so that the number density of galaxies is matched.
+    """
+
+    @cached_property
+    def mask(self):
+        """Mask Function for matching density"""
+        integrand1 = self.density1 * self.m1
+        integrand2 = self.density2 * self.m2
+        # cumint = cumsimps(integrand1,dx = self.dlnx)
+        cumint1 = intg.cumtrapz(integrand1, dx=self.dlnx, initial=0)  # len m
+        cumint1 = np.outer(np.ones_like(self.r), cumint1)  # r,m
+        cumint2 = intg.cumtrapz(integrand2, dx=self.dlnx, initial=0)  # len m
+        cumint2 = np.outer(np.ones_like(self.r), cumint2)  # r,m
+        n1 = np.sqrt((self.density_mod**2.)**2./(self.density_mod2**2.))
+        n2 = np.sqrt((self.density_mod**2.)**2./(self.density_mod1**2.))
+        n1[(self.density_mod2 == 0) & (self.density_mod == 0)] = 0
+        n2[(self.density_mod1 == 0) & (self.density_mod == 0)] = 0
+        return (np.where(
+            cumint1 > 1.0001 * np.outer(n1, 
+            np.ones_like(self.m1)),
+            np.ones_like(cumint1, dtype=bool),
+            np.zeros_like(cumint1, dtype=bool),
+        ), np.where(
+            cumint2 > 1.0001 * np.outer(n2, 
+            np.ones_like(self.m2)),
+            np.ones_like(cumint2, dtype=bool),
+            np.zeros_like(cumint2, dtype=bool),
+        ))
+
+    def integrate(self):
+        """
+        Integrate the :meth:`raw_integrand` over mass.
+        """
+        integ1 = self.raw_integrand1()  # r,k,m
+        integ2 = self.raw_integrand2()
+        integ1.transpose((1, 0, 2))[:, self.mask[0]] = 0
+        integ2.transpose((1, 0, 2))[:, self.mask[1]] = 0
+        return intg.simps(integ1, dx=self.dlnx) * intg.simps(integ2, dx=self.dlnx)
+
+
+if USE_NUMBA:
+
+    class NgMatched_(DblEllipsoid_):  # pragma: no cover
+        r"""
+        The same as :class:`NgMatched`. But uses NUMBA to speed up the integration.
+        """
+
+        @cached_property
+        def mask(self):
+            """Mask Function for matching density"""
+            integrand1 = self.density1 * self.m1
+            integrand2 = self.density2 * self.m2
+            # cumint = cumsimps(integrand,dx = self.dlnx)
+            cumint1 = intg.cumtrapz(integrand1, dx=self.dlnx, initial=0)  # len m
+            cumint1 = np.outer(np.ones_like(self.r), cumint1)  # r,m
+            cumint2 = intg.cumtrapz(integrand2, dx=self.dlnx, initial=0)  # len m
+            cumint2 = np.outer(np.ones_like(self.r), cumint2)  # r,m
+            return (np.where(
+                cumint1 > 1.0001 * np.outer(self.density_mod1, np.ones_like(self.m1)),
+                np.ones_like(cumint1, dtype=bool),
+                np.zeros_like(cumint1, dtype=bool),
+            ), np.where(
+                cumint2 > 1.0001 * np.outer(self.density_mod2, np.ones_like(self.m2)),
+                np.ones_like(cumint2, dtype=bool),
+                np.zeros_like(cumint2, dtype=bool),))
+
+        def integrate(self):
+            """
+            Integrate the :meth:`raw_integrand` over mass.
+            """
+            integ1 = self.raw_integrand1()  # r,k,m
+            integ2 = self.raw_integrand2()
+            integ1.transpose((1, 0, 2))[:, self.mask[0]] = 0
+            integ2.transpose((1, 0, 2))[:, self.mask[1]] = 0
+            return intg.simps(integ1, dx=self.dlnx) * intg.simps(integ2, dx=self.dlnx)
+
+def cumsimps(func, dx):
+    """
+    A very simplistic cumulative simpsons rule integrator. func is an array,
+    h is the equal spacing. It is somewhat inaccurate in the first few bins, since
+    we just truncate the integral, regardless of whether it is odd or even numbered.
+    Examples
+    --------
+    >>> x = np.linspace(0,1,1001)
+    >>> y = np.sin(x)
+    >>> print cumsimps(y,0.001)/(1-np.cos(x))
+    """
+    f1 = func.copy()
+    f1[1:-1] *= 2
+    f1[1:-1:2] *= 2
+    rm = func.copy()
+    rm[1:-1:2] *= 3
+    cs = np.cumsum(f1)
+    cs -= rm
+    return cs * dx / 3
+        
+        
+        
+        
+        
+
+    def raw_integrand(self) -> np.ndarray:
+        """
+        Return either a 2d (k,m) or 3d (r,k,m) array with the general integrand.
+        """
+        if self.bias.ndim == 1:
+            return self.Ifunc * self.bias * self.m  # *m since integrating in logspace
+        else:
+            return np.einsum("ij,kj->kij", self.Ifunc * self.m, self.bias)
+
+    def integrate(self):
+        """
+        Integrate the :meth:`raw_integrand` over mass.
+
+        This should pass back whatever is multiplied by P_m(k) to get the two-halo
+        term. Often this will be a square of an integral, sometimes a Double-integral.
+        """
+        pass
