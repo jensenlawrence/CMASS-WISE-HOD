@@ -15,8 +15,8 @@ sys.path.append('src')
 from get_model_info import get_model_params
 from crosshod import CrossHOD
 from model_variations import ModelVariations
-from eval_model import cobaya_optimize, cobaya_mcmc, grid_search
-from plot_results import wtheta_plot, posterior_plot
+from eval_model import cobaya_optimize, cobaya_mcmc, gridsearch
+from plot_results import cmass_autocorr_plot, crosscorr_plot, get_corr_title, posterior_plot
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Packages, Data, and Parameter Paths
@@ -92,14 +92,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Functions to be executed
-    assert args.action in ('optimize', 'mcmc', 'wtheta_plot', 'posterior_plot', 'gridsearch'), 'Invalid action chosen.'
+    assert args.action in ('optimize', 'mcmc', 'wtheta_plot', 'posterior_plot', 'gridsearch', 'test'), 'Invalid action chosen.'
 
     # Running optimizer
     if args.action == 'optimize':
 
         # Getting output file name
         method = 'scipy'
-        output = 'results/optim_cmass_reduced_1'
+        output = 'results/optim1'
 
         if output == '':
             output = input('Enter optimizer output path: ')
@@ -134,42 +134,31 @@ if __name__ == '__main__':
 
     # Plotting w(theta)
     elif args.action == 'wtheta_plot':
+        
+        # Getting output file names
+        auto_output = ''
 
-        # Creating plot title
-        cmass_s1 = r'$M_{\min} = $' + f'{params["CMASS HOD"]["M_min"]["val"]}'
-        cmass_s2 = r'$M_{1} = $' + f'{params["CMASS HOD"]["M_1"]["val"]}'
-        cmass_s3 = r'$\alpha = $' + f'{params["CMASS HOD"]["alpha"]["val"]}'
-        cmass_s4 = r'$M_{0} = $' + f'{params["CMASS HOD"]["M_0"]["val"]}'
-        cmass_s5 = r'$\sigma_{\log{M}} = $' + f'{params["CMASS HOD"]["sig_logm"]["val"]}'
-        cmass_s6 = f'central = {params["CMASS HOD"]["central"]["val"]}'
-        cmass_title = f'CMASS : {cmass_s1}, {cmass_s2}, {cmass_s3}, {cmass_s4}, {cmass_s5}, {cmass_s6}\n'
+        if auto_output == '':
+            auto_output = input('Enter the autocorrelation graph output path: ')
 
-        wise_s1 = r'$M_{\min} = $' + f'{params["WISE HOD"]["M_min"]["val"]}'
-        wise_s2 = r'$M_{1} = $' + f'{params["WISE HOD"]["M_1"]["val"]}'
-        wise_s3 = r'$\alpha = $' + f'{params["WISE HOD"]["alpha"]["val"]}'
-        wise_s4 = r'$M_{0} = $' + f'{params["WISE HOD"]["M_0"]["val"]}'
-        wise_s5 = r'$\sigma_{\log{M}} = $' + f'{params["WISE HOD"]["sig_logm"]["val"]}'
-        wise_s6 = f'central = {params["WISE HOD"]["central"]["val"]}'
-        wise_title = f'WISE : {wise_s1}, {wise_s2}, {wise_s3}, {wise_s4}, {wise_s5}, {wise_s6}\n'
+        cross_output = ''
 
-        R_s1 = r'$R_{ss} = $' + f'{params["galaxy_corr"]["R_ss"]["val"]}'
-        R_s2 = r'$R_{cs} = $' + f'{params["galaxy_corr"]["R_cs"]["val"]}'
-        R_s3 = r'$R_{sc} = $' + f'{params["galaxy_corr"]["R_sc"]["val"]}'
-        R_title = f'{R_s1}, {R_s2}, {R_s3}'
+        if cross_output == '':
+            cross_output = input('Enter the cross-correlation graph output path: ')
 
-        title = cmass_title + wise_title + R_title
+        # Plotting functions
+        title = get_corr_title(params, cmass_wise_cross_hod.nbar_likelihood)
 
-        # Getting output file name
-        output = ''
-
-        if output == '':
-            output = input('Enter the graph output path: ')
-
-        # Plotting function
-        wtheta_plot(
+        cmass_autocorr_plot(
             cross_hod = cmass_wise_cross_hod,
             plot_title = title,
-            save_as = output
+            save_as = auto_output
+        )
+
+        crosscorr_plot(
+            cross_hod = cmass_wise_cross_hod,
+            plot_title = title,
+            save_as = cross_output
         )
 
     # Plotting MCMC posteriors
@@ -192,27 +181,31 @@ if __name__ == '__main__':
             save_as = save_as
         )
 
-
     # CMASS parameters grid search
     elif args.action == 'gridsearch':
+        likelihood_func = cmass_wise_cross_hod.nbar_likelihood
         output = 'results/grid1'
+        gridsearch(params, likelihood_func, output)
 
-        grid_search(
-            likelihood_func = cmass_wise_cross_hod.nbar_likelihood,
-            output = output,
-            cmass_M_mins = np.linspace(params["CMASS HOD"]["M_min"]["sample_min"], params["CMASS HOD"]["M_min"]["sample_max"], params["CMASS HOD"]["M_min"]["sample_div"]),
-            cmass_M_1s = np.linspace(params["CMASS HOD"]["M_1"]["sample_min"], params["CMASS HOD"]["M_1"]["sample_max"], params["CMASS HOD"]["M_1"]["sample_div"]),
-            cmass_alphas = np.linspace(params["CMASS HOD"]["alpha"]["sample_min"], params["CMASS HOD"]["alpha"]["sample_max"], params["CMASS HOD"]["alpha"]["sample_div"]),
-            cmass_M_0s = np.linspace(params["CMASS HOD"]["M_0"]["sample_min"], params["CMASS HOD"]["M_0"]["sample_max"], params["CMASS HOD"]["M_0"]["sample_div"]),
-            cmass_sig_logms = np.linspace(params["CMASS HOD"]["sig_logm"]["sample_min"], params["CMASS HOD"]["sig_logm"]["sample_max"], params["CMASS HOD"]["sig_logm"]["sample_div"]),
-            wise_M_mins = np.linspace(params["WISE HOD"]["M_min"]["sample_min"], params["WISE HOD"]["M_min"]["sample_max"], params["WISE HOD"]["M_min"]["sample_div"]),
-            wise_M_1s = np.linspace(params["WISE HOD"]["M_1"]["sample_min"], params["WISE HOD"]["M_1"]["sample_max"], params["WISE HOD"]["M_1"]["sample_div"]),
-            wise_alphas = np.linspace(params["WISE HOD"]["alpha"]["sample_min"], params["WISE HOD"]["alpha"]["sample_max"], params["WISE HOD"]["alpha"]["sample_div"]),
-            wise_M_0s = np.linspace(params["WISE HOD"]["M_0"]["sample_min"], params["WISE HOD"]["M_0"]["sample_max"], params["WISE HOD"]["M_0"]["sample_div"]),
-            wise_sig_logms = np.linspace(params["WISE HOD"]["sig_logm"]["sample_min"], params["WISE HOD"]["sig_logm"]["sample_max"], params["WISE HOD"]["sig_logm"]["sample_div"]),
+    # Testing area
+    elif args.action == 'test':
+
+        likelihood = cmass_wise_cross_hod.nbar_likelihood(
+            cmass_M_min = 12.94,
+            cmass_M_1 = 14.15,
+            cmass_alpha = 0.95,
+            cmass_M_0 = 13.05,
+            cmass_sig_logm = 0.43,
+            wise_M_min = 13.09,
+            wise_M_1 = 13.925,
+            wise_alpha = 0.97,
+            wise_M_0 = 12.94,
+            wise_sig_logm = 0.6,
             R_ss = params["galaxy_corr"]["R_ss"]["val"],
             R_cs = params["galaxy_corr"]["R_cs"]["val"],
             R_sc = params["galaxy_corr"]["R_sc"]["val"]
         )
+
+        print(likelihood)
 
 # ----------------------------------------------------------------------------------------------------------------------
