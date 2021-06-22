@@ -76,8 +76,8 @@ class AngularCrossCF(CrossCorrelations):
         """
         super(AngularCrossCF, self).__init__(**kwargs)
         #print('self z',self.z)
-        #print('self halo model 1 z',self.halo_model_1.z)
-        #print('self halo model 2 z',self.halo_model_2.z)
+        print('self halo model 1 z',self.halo_model_1.z)
+        print('self halo model 2 z',self.halo_model_2.z)
 
         if self.halo_model_1.z < zmin or self.halo_model_1.z > zmax:
             warnings.warn(
@@ -376,7 +376,7 @@ class CrossHOD(AngularCrossCF):
             p_of_z = False,
             zmin = zmin,
             zmax = zmax,
-            z = 0.5 * (zmin + zmax),
+            z = self.cmass_model['z'],
             check_p_norm = False,
             hod_model = 'Zheng05',
             hod_params = cmass_model['hod_params'],
