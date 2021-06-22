@@ -75,6 +75,9 @@ class AngularCrossCF(CrossCorrelations):
             Any keyword arguments passed down to :class:`halomod.HaloModel`.
         """
         super(AngularCrossCF, self).__init__(**kwargs)
+        #print('self z',self.z)
+        #print('self halo model 1 z',self.halo_model_1.z)
+        #print('self halo model 2 z',self.halo_model_2.z)
 
         if self.halo_model_1.z < zmin or self.halo_model_1.z > zmax:
             warnings.warn(
@@ -324,7 +327,7 @@ class CrossHOD(AngularCrossCF):
 
         # Calculating distances and theta values
         distance = Planck15.comoving_distance(z).value * Planck15.H0.value/100.0
-        thetas = self.data[7:,0]/distance
+        thetas = self.data[:,0]/distance
         self.thetas = thetas
 
         # CMASS redshift calculations
@@ -373,6 +376,7 @@ class CrossHOD(AngularCrossCF):
             p_of_z = False,
             zmin = zmin,
             zmax = zmax,
+            z = 0.5 * (zmin + zmax),
             check_p_norm = False,
             hod_model = 'Zheng05',
             hod_params = cmass_model['hod_params'],
