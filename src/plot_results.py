@@ -2,48 +2,46 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
-import numpy as np
-import matplotlib.pyplot as plt
 from os import listdir
 from os.path import isfile, join
-from getdist.mcsamples import MCSamples, loadMCSamples
-from getdist import gaussian_mixtures, plots
+import numpy as np
+import matplotlib.pyplot as plt
+from colour import Color
+from getdist.mcsamples import MCSamples
+from getdist import plots
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Angular Cross-Correlation Plots
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Function for plotting CMASS autocorrelated w(theta)
-def cmass_autocorr_plot(cross_hod, sampled=[], plot_title='', save_as='', dpi=400):
+# Plot CMASS autocorrelation function w(theta)
+def cmass_autocorr_plot(cmass_wise_hod, sampled=[], plot_title='', output='', dpi=200):
     """
-    cmass_autocorr_plot : CrossHOD, array-like, str, str, int -> Plot
-        Produces a figure showing the observed and calculated angular autocorrelation functions for
-        the CMASS autocorrelation.
+    Generates a plot of the observed and calculated CMASS angular autocorrelation functions.
 
-    cross_hod : CrossHOD
-        The instance of a CrossHOD class containing the relevant galaxy distribution data and HOD models required
-        for constructing the angular correlation vs. theta plot.
+    Parameters
+    ----------
+    cmass_wise_hod : CMASS_WISE_HOD
+        The instance of the CMASS_WISE_HOD class whose observed and calculated CMASS autocorrelations will
+        be plotted.
+    sampled : array-like, optional
+        Array-like object of the form [sampled_param, sampled_range].
+        sampled_param : str
+            String representation of one of the model parameters to be sampled over during graphing.
+        sampled_range : array-like
+            Array containing the range of values over which sampled_param will be sampled.
+    plot_title : str, optional
+        String representation of the plot title.
+    output : str, optional
+        String representation of the path and file name the plot will be saved as.
+    dpi : int, optional
+        The dots-per-inch (resolution) of the graph.
 
-    sampled : Array-like
-        Array-like object of the form [sampled_param, sampled_range]. Optional argument.
-            sampled_param : Str
-                String representation of one of the parameters to be sampled over during graphing.
-            sampled_range : Array-like
-                Array-like object which contains the values over which the related sampled_param will be sampled.
-
-    plot_title : Str
-        String representation of the title of the plot that will be produced.
-        Default value is ''.
-
-    save_as : Str
-        String representation of the file name the plot will be saved under.
-        Default value is ''.
-
-    dpi : Int
-        Values specifying the dpi (measure of resolution) of the plot that will be produced.
-        Default value is 400.
+    Returns
+    -------
+    None
     """
-    # Plotting while varying one parameter
+    # Plot while varying one parameter
     if bool(sampled): 
         sampled_param = sampled[0]
         sampled_range = sampled[1]
@@ -54,17 +52,17 @@ def cmass_autocorr_plot(cross_hod, sampled=[], plot_title='', save_as='', dpi=40
 
         counter = 0
         for sampled_value in sampled_range:
-            cmass_auto = cross_hod.cmass_auto
+            cmass_auto = cmass_wise_hod.cmass_auto
             cmass_auto.update(hod_params={sampled_param: sampled_value})
-            plt.plot(cross_hod.thetas[3:], cross_hod.corr_cmass_auto(), str(colour_range[counter]),
+            plt.plot(cmass_wise_hod.thetas[3:], cmass_wise_hod.corr_cmass_auto(), str(colour_range[counter]),
                         label=f'{sampled_param} = {sampled_value}')
             counter += 1
 
-    # Plotting holding all parameters fixed
+    # Plot holding all parameters fixed
     else:
-        plt.plot(cross_hod.thetas[3:], cross_hod.corr_cmass_auto(), color='dodgerblue', label='Model')
+        plt.plot(cmass_wise_hod.thetas[3:], cmass_wise_hod.corr_cmass_auto(), color='dodgerblue', label='Model')
         
-    plt.errorbar(cross_hod.thetas[3:], cross_hod.data[:7,1], np.sqrt(np.diag(cross_hod.covariance[:7,:7])),
+    plt.errorbar(cmass_wise_hod.thetas[3:], cmass_wise_hod.data[:7,1], np.sqrt(np.diag(cmass_wise_hod.covariance[:7,:7])),
                  color='springgreen', label='CMASS Autocorrelation Data')
 
     # Plot formatting
@@ -79,45 +77,42 @@ def cmass_autocorr_plot(cross_hod, sampled=[], plot_title='', save_as='', dpi=40
     if bool(plot_title):
         plt.title(plot_title, fontsize=9)
 
-    if bool(save_as):
-        plt.savefig(save_as, dpi=dpi)
+    if bool(output):
+        plt.savefig(output, dpi=dpi)
 
     else:
         plt.savefig('cmass_autocorr_plot.png', dpi=dpi)
 
     plt.close()
 
-# Function for plotting CMASS-WISE cross-correlated w(theta)
-def crosscorr_plot(cross_hod, sampled=[], plot_title='', save_as='', dpi=400):
+# Plot CMASS-WISE cross-correlation function w(theta)
+def crosscorr_plot(cmass_wise_hod, sampled=[], plot_title='', output='', dpi=200):
     """
-    crosscorr_plot : CrossHOD, array-like, str, str, int -> Plot
-        Produces a figure showing the observed and calculated angular cross-correlation functions for
-        the CMASS-WISE cross-correlation.
+    Generates a plot of the observed and calculated CMASS-WISE angular cross-correlation functions.
 
-    cross_hod : CrossHOD
-        The instance of a CrossHOD class containing the relevant galaxy distribution data and HOD models required
-        for constructing the angular correlation vs. theta plot.
+    Parameters
+    ----------
+    cmass_wise_hod : CMASS_WISE_HOD
+        The instance of the CMASS_WISE_HOD class whose observed and calculated CMASS-WISE cross-correlations will
+        be plotted.
+    sampled : array-like, optional
+        Array-like object of the form [sampled_param, sampled_range].
+        sampled_param : str
+            String representation of one of the model parameters to be sampled over during graphing.
+        sampled_range : array-like
+            Array containing the range of values over which sampled_param will be sampled.
+    plot_title : str, optional
+        String representation of the plot title.
+    output : str, optional
+        String representation of the path and file name the plot will be saved as.
+    dpi : int, optional
+        The dots-per-inch (resolution) of the graph.
 
-    sampled : Array-like
-        Array-like object of the form [sampled_param, sampled_range]. Optional argument.
-            sampled_param : Str
-                String representation of one of the parameters to be sampled over during graphing.
-            sampled_range : Array-like
-                Array-like object which contains the values over which the related sampled_param will be sampled.
-
-    plot_title : Str
-        String representation of the title of the plot that will be produced.
-        Default value is ''.
-
-    save_as : Str
-        String representation of the file name the plot will be saved under.
-        Default value is ''.
-
-    dpi : Int
-        Values specifying the dpi (measure of resolution) of the plot that will be produced.
-        Default value is 400.
+    Returns
+    -------
+    None
     """
-    # Plotting while varying one parameter
+    # Plot while varying one parameter
     if bool(sampled): 
         sampled_param = sampled[0]
         sampled_range = sampled[1]
@@ -128,17 +123,17 @@ def crosscorr_plot(cross_hod, sampled=[], plot_title='', save_as='', dpi=400):
 
         counter = 0
         for sampled_value in sampled_range:
-            cross = cross_hod.cross
+            cross = cmass_wise_hod.cross
             cross.halo_model_2.update(hod_params={sampled_param: sampled_value})
-            plt.plot(cross_hod.thetas, cross_hod.corr_cross(), str(colour_range[counter]),
+            plt.plot(cmass_wise_hod.thetas, cmass_wise_hod.corr_cross(), str(colour_range[counter]),
                         label=f'{sampled_param} = {sampled_value}')
             counter += 1
 
-    # Plotting holding all parameters fixed
+    # Plot holding all parameters fixed
     else:
-        plt.plot(cross_hod.thetas, cross_hod.corr_cross(), color='dodgerblue', label='Model')
+        plt.plot(cmass_wise_hod.thetas, cmass_wise_hod.corr_cross(), color='dodgerblue', label='Model')
         
-    plt.errorbar(cross_hod.thetas, cross_hod.data[7:,1], np.sqrt(np.diag(cross_hod.covariance[7:,7:])),
+    plt.errorbar(cmass_wise_hod.thetas, cmass_wise_hod.data[7:,1], np.sqrt(np.diag(cmass_wise_hod.covariance[7:,7:])),
                  color='springgreen', label='Cross-correlation Data')
 
     # Plot formatting
@@ -153,19 +148,33 @@ def crosscorr_plot(cross_hod, sampled=[], plot_title='', save_as='', dpi=400):
     if bool(plot_title):
         plt.title(plot_title, fontsize=9)
 
-    if bool(save_as):
-        plt.savefig(save_as, dpi=dpi)
+    if bool(output):
+        plt.savefig(output, dpi=dpi)
 
     else:
         plt.savefig('crosscorr_plot.png', dpi=dpi)
 
     plt.close()
 
-# Title generating function
-def get_corr_title(params, likelihood_func):
+# Generate titles for w(theta) plots
+def get_corr_title(params, loglike_func):
     """
-    Docstring goes here
+    Generates titles for the auto-correlation and cross-correlation plots.
+
+    Parameters
+    ----------
+    params : dict
+        Dictionary of the CMASS-WISE HOD model parameters.
+    loglike_func : function
+        Function that calculates the log-likelihood that the observed BOSS-CMASS and WISE data were produced by an
+        HOD model with the BOSS-CMASS HOD model and WISE HOD model parameters.
+
+    Returns
+    -------
+    title : str
+        Correlation plot title.
     """
+    # Get CMASS title components
     cmass_s1 = r'$M_{\min} = $' + f'{params["CMASS HOD"]["M_min"]["val"]}'
     cmass_s2 = r'$M_{1} = $' + f'{params["CMASS HOD"]["M_1"]["val"]}'
     cmass_s3 = r'$\alpha = $' + f'{params["CMASS HOD"]["alpha"]["val"]}'
@@ -174,6 +183,7 @@ def get_corr_title(params, likelihood_func):
     cmass_s6 = f'central = {params["CMASS HOD"]["central"]["val"]}'
     cmass_title = f'CMASS : {cmass_s1}, {cmass_s2}, {cmass_s3}, {cmass_s4}, {cmass_s5}, {cmass_s6}\n'
 
+    # Get WISE title components
     wise_s1 = r'$M_{\min} = $' + f'{params["WISE HOD"]["M_min"]["val"]}'
     wise_s2 = r'$M_{1} = $' + f'{params["WISE HOD"]["M_1"]["val"]}'
     wise_s3 = r'$\alpha = $' + f'{params["WISE HOD"]["alpha"]["val"]}'
@@ -182,10 +192,13 @@ def get_corr_title(params, likelihood_func):
     wise_s6 = f'central = {params["WISE HOD"]["central"]["val"]}'
     wise_title = f'WISE : {wise_s1}, {wise_s2}, {wise_s3}, {wise_s4}, {wise_s5}, {wise_s6}\n'
 
+    # Get R title components
     R_s1 = r'$R_{ss} = $' + f'{params["galaxy_corr"]["R_ss"]["val"]}'
     R_s2 = r'$R_{cs} = $' + f'{params["galaxy_corr"]["R_cs"]["val"]}'
     R_s3 = r'$R_{sc} = $' + f'{params["galaxy_corr"]["R_sc"]["val"]}'
-    likelihood = likelihood_func(
+
+    # Calculate log-likliehood
+    likelihood = loglike_func(
         cmass_M_min = params["CMASS HOD"]["M_min"]["val"],
         cmass_M_1 = params["CMASS HOD"]["M_1"]["val"],
         cmass_alpha = params["CMASS HOD"]["alpha"]["val"],
@@ -204,6 +217,7 @@ def get_corr_title(params, likelihood_func):
     likelihood_title = f'Log-likelihood = {likelihood}'
     R_title += f' | {likelihood_title}'
 
+    # Get complete title
     title = cmass_title + wise_title + R_title
 
     return title
@@ -213,38 +227,39 @@ def get_corr_title(params, likelihood_func):
 # ----------------------------------------------------------------------------------------------------------------------
 
 # Function for plotting posterior distributions from MCMC chains
-def posterior_plot(samples_path, names, labels, save_as=''):
+def posterior_plot(samples_path, names, labels, output=''):
     """
-    posterior_plot : str, array-like, array-like, str -> Plot
-        Returns a plot of the posterior distribution determined from the MCMC chain results stored at samples_path.
+    Generates a plot of the posterior distribution of the CMASS-WISE HOD model parameters determined by an MCMC chain.
 
+    Parameters
+    ----------
     samples_path : str
         String representation of the path to the MCMC chain results.
-
     names : array-like
         Array of strings containing the names of each variable in the posterior distribution. Order should reflect the
         order of the columns in the posterior distribution file.
-
     labels : array-like
         Array of strings containing the LaTex representations of each variable in the posterior distribution. Order
         should reflect the order of the columns in the posterior distribution file.
+    output : Str
+        String representation of the path and file name the plot will be saved as.
 
-    save_as : Str
-        String representation of the file name the plot will be saved under.
-        Default value is ''.
+    Returns
+    -------
+    None
     """
-    # Getting all files in target directory
+    # Get all files in target directory
     samples_dir = '/'.join(samples_path.split('/')[:-1]) + '/'
     files_only = [f for f in listdir(samples_dir) if isfile(join(samples_dir, f))]
 
-    # Determining which files in target directory are desired MCMC chain results files
+    # Determine which files in target directory are desired MCMC chain results files
     samples_name = samples_path.split('/')[-1]
     sample_files = []
     for file in files_only:
         if (samples_name in file) and ('.txt' in file):
             sample_files.append(file)
 
-    # Loading data from MCMC chains files
+    # Load data from MCMC chains files
     sample_data = []
     for i in range(len(sample_files)):
         load_sample = np.loadtxt(samples_dir + sample_files[i])
@@ -255,23 +270,23 @@ def posterior_plot(samples_path, names, labels, save_as=''):
                 step_vals.append(load_sample[j][k + 2])
             sample_vals.append(step_vals)
         
-        # Removing first 30% of data to remove bad values due to burn-in
+        # Remove first 30% of data to remove bad values due to burn-in
         sample_vals = sample_vals[int(np.ceil(0.3*len(sample_vals))):]
         sample_data.append(np.array(sample_vals))
 
-    # Loading MC samples from data
+    # Load MC samples from data
     samples = []
     for i in range(len(sample_files)):
         sample = MCSamples(samples = sample_data[i], names = names, labels = labels, label = f'Chain {i + 1}')
         samples.append(sample)
 
-    # Plotting posterior distribution
+    # Plot posterior distribution
     g = plots.get_subplot_plotter()
     g.triangle_plot(samples, filled=True)
 
-    if bool(save_as):
-        save_path = '/'.join(save_as.split('/')[:-1])
-        save_name = save_as.split('/')[-1]
+    if bool(output):
+        save_path = '/'.join(output.split('/')[:-1])
+        save_name = output.split('/')[-1]
         g.export(save_name, save_path)
 
     else:
