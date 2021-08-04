@@ -9,27 +9,31 @@ from get_model_info import get_model_params
 # ModelVariations Class
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Class for varying HOD model parameters
 class ModelVariations:
     """
-    Class for generating the parameter space for the CMASS-WISE HOD model so optimization and statistical analysis
-    procedures can be performed.
+    Generates the parameter space necessary for optimization and statistical analysis to be performed on the 
+    CMASS-WISE HOD model.
     """
     # Initialize class
     def __init__(self, params_file):
         """
-        __init__ : self, str -> ModelVariations
-            Defines the attributes of the ModelVariations class.
+        Initializes the ModelVariations class.
 
+        Parameters
+        ----------
         params_file : str
-            String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
-            WISE HOD models.
+            String representation of the path to the .json file containing the parameters for the BOSS-CMASS and WISE
+            HOD models.
+
+        Returns
+        -------
+        None
         """
-        # Extracting fixed and varied parameter information for optimization calculations
-        self.params_file = params_file
+        # Initialize parameter file attribute and get model parameters
+        self.params_file = params_file 
         model_params = get_model_params(params_file)
 
-        # Renaming CMASS and WISE parameter keys
+        # Rename CMASS and WISE parameter keys
         cmass_keys = list(model_params['CMASS HOD'].keys())
         new_cmass_keys = ['cmass_' + key for key in cmass_keys]
         wise_keys = list(model_params['WISE HOD'].keys())
@@ -40,14 +44,14 @@ class ModelVariations:
             model_params['WISE HOD'][new_wise_keys[i]] = model_params['WISE HOD'][wise_keys[i]]
             del model_params['WISE HOD'][wise_keys[i]]
 
-        # Initializing lists for keys and values
+        # Initializelists for keys and values
         all_params_dict = {**model_params['CMASS HOD'], **model_params['WISE HOD'], **model_params['galaxy_corr']}
         del all_params_dict['cmass_central']
         del all_params_dict['wise_central']
         all_params_keys = list(all_params_dict.keys())
         all_params_vals = list(all_params_dict.values())
         
-        # Determining fixed and sampled keys and values
+        # Determine fixed and sampled keys and values
         sample_params = []
         sample_range_mins = []
         sample_range_maxs = []
@@ -78,7 +82,7 @@ class ModelVariations:
         self.fixed_params = fixed_params
         self.fixed_values = fixed_values
 
-        # Creating parameters dictionary
+        # Create parameters dictionary
         params_dict = {}
         for i in range(len(self.fixed_params)):
             params_dict[self.fixed_params[i]] = self.fixed_values[i]
@@ -89,11 +93,10 @@ class ModelVariations:
                                                   'latex': self.sample_params[i]}
         self.sampling_params_dict = params_dict
 
-    # Print representation
+    # Printable representation of class instance
     def __str__(self):
         """
-        __str__ : self -> str
-            Provides a string representation of a given instance of the ModelVariations class
+        Provides a printable representation of an instance of the ModelVariations class.
         """
         rep_str = '-'*80
         rep_str += '\nInstance of the ModelVariations class.'
@@ -107,19 +110,22 @@ class ModelVariations:
             rep_str += f'\n- Holds {self.fixed_params[i]} fixed at {self.fixed_values[i]}'
         rep_str += '\n' + '-'*80
 
-        return rep_str
-
-    # Class equivalence
+    # Equivalence of class instances
     def __eq__(self, other):
         """
-        __eq__ : self, any -> bool
-            Allows for the comparison of an instance of the ModelVariations class to another object.
-            Returns True if both are instances of the ModelVariations class with identical properties, and False
-            otherwise
+        Compares an instance of the ModelVariations class to any other object.
 
+        Parameters
+        ----------
         other : any
-            Any object against which a given instance of the ModelVariations class is compared.
+            Any other object being compared against.
+
+        Returns
+        -------
+        are_equal : bool
+            True if other is an instance of the ModelVariations class with identical parameters, and False otherwise.
         """
-        return isinstance(other, ModelVariations) and (self.sampled == other.sampled) and (self.fixed == other.fixed)
+        are_equal = isinstance(other, ModelVariations) and (self.sampled == other.sampled) and (self.fixed == other.fixed)
+        return are_equal
 
 # ----------------------------------------------------------------------------------------------------------------------
