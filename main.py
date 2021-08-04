@@ -13,9 +13,9 @@ from halomod.cross_correlations import HODCross
 # Custom imports
 sys.path.append('src')
 from get_model_info import get_model_params
-from crosshod import CrossHOD
+from cmass_wise_hod import CMASS_WISE_HOD
 from model_variations import ModelVariations
-from eval_model import cobaya_optimize, cobaya_mcmc, gridsearch
+from eval_model import optimize_model, mcmc, gridsearch
 from plot_results import cmass_autocorr_plot, crosscorr_plot, get_corr_title, posterior_plot
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -63,15 +63,29 @@ class VariableCorr(HODCross):
 # Class Instances
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Instance of CrossHOD
-cmass_wise_cross_hod = CrossHOD(
+# Instance of CMASS_WISE_HOD
+noexclusion_hod = CMASS_WISE_HOD(
     cmass_redshift_file = cmass_redshift_file,
     wise_redshift_file = wise_redshift_file,
     data_file = data_file,
     covariance_file = covariance_file,
     params_file = params_file,
     cross_hod_model = VariableCorr,
-    diag_cov = False
+    diag_covariance = False, 
+    exclusion_model = None,
+    exclusion_params = None
+)
+
+ngmatched_hod = CMASS_WISE_HOD(
+    cmass_redshift_file = cmass_redshift_file,
+    wise_redshift_file = wise_redshift_file,
+    data_file = data_file,
+    covariance_file = covariance_file,
+    params_file = params_file,
+    cross_hod_model = VariableCorr,
+    diag_covariance = False, 
+    exclusion_model = 'NgMatched',
+    exclusion_params = None
 )
 
 # Instance of ModelVariations
@@ -83,129 +97,177 @@ cmass_wise_variations = ModelVariations(params_file)
 
 if __name__ == '__main__':
 
-    # Initializing argument parser
+    # Initialize argument parser
     parser = argparse.ArgumentParser(description="""HOD model for the cross-correlation of BOSS-CMASS and WISE
-                                                    galaxies at z ~ 0.5.""")
-    parser.add_argument('--action', type=str, metavar='ACTION',
-                        help="""Function executed by the program. Options are: optimize, mcmc, wtheta_plot,
+                                                    galaxies at a redshift of z ~ 0.5.""")
+    parser.add_argument('-a', '--action', type=str, metavar='action',
+                        help="""Function executed by the program. Options are: optimize, mcmc, gridsearch, corr_plots,
                                 posterior_plot.""")
     args = parser.parse_args()
 
-    # Functions to be executed
-    assert args.action in ('optimize', 'mcmc', 'wtheta_plot', 'posterior_plot', 'gridsearch', 'test'), 'Invalid action chosen.'
+    # Verify argument is valid
+    assert args.action in ('optimize', 'mcmc', 'gridsearch', 'corr_plots',
+                           'posterior_plot', 'test'), 'Invalid action chosen.'
 
-    # Running optimizer
+    # Optimizer action
     if args.action == 'optimize':
-
-        # Getting output file name
-        method = 'scipy'
+        
+        # Set optimizer output
         output = 'results/optim1'
-
         if output == '':
             output = input('Enter optimizer output path: ')
-
-        # Optimization function
-        cobaya_optimize(
+        
+        # Run optimizer
+        optimize_model(
             model_variations = cmass_wise_variations,
-            likelihood_func = cmass_wise_cross_hod.nbar_likelihood,
-            method = method,
+            loglike_func = ngmatched_hod.nbar_loglike,
+            method = 'scipy',
             packages_path = packages_path,
             output = output,
             debug = True
         )
 
-    # Running MCMC chains
+    # MCMC action
     elif args.action == 'mcmc':
 
-        # Getting output file name
-        output = ''
-
+        # Set MCMC output
+        output = 'results/mcmc1'
         if output == '':
             output = input('Enter MCMC output path: ')
 
-        # MCMC function
-        cobaya_mcmc(
+        # Run MCMC chains
+        mcmc(
             model_variations = cmass_wise_variations,
-            likelihood_func = cmass_wise_cross_hod.nbar_likelihood,
+            loglike_func = ngmatched_hod.nbar_loglike,
             packages_path = packages_path,
             output = output,
             debug = True
         )
 
-    # Plotting w(theta)
-    elif args.action == 'wtheta_plot':
-        
-        # Getting output file names
+    # Grid search action
+    elif args.action == 'gridsearch':
+
+        # Set grid search output
+        output = 'results/grid1'
+        if output == '':
+            output = input('Enter grid search output path: ')
+
+        # Run grid search
+        gridsearch(
+            params = params,
+            loglike_func = ngmatched_hod.nbar_components,
+            output = output
+        )
+
+    # Correlation plots action
+    elif args.action == 'corr_plots':
+
+        # Set autocorr plot output
         auto_output = ''
-
         if auto_output == '':
-            auto_output = input('Enter the autocorrelation graph output path: ')
+            auto_output = input('Enter autocorrelation plot output path: ')
 
+        # Set cross-corr plot output
         cross_output = ''
-
         if cross_output == '':
-            cross_output = input('Enter the cross-correlation graph output path: ')
+            cross_output = input('Enter cross-correlation plot output path: ')
 
-        # Plotting functions
-        title = get_corr_title(params, cmass_wise_cross_hod.nbar_likelihood)
+        # Generate correlation plots
+        title = get_corr_title(params, ngmatched_hod.nbar_components)
 
         cmass_autocorr_plot(
-            cross_hod = cmass_wise_cross_hod,
+            cmass_wise_hod = ngmatched_hod,
+            sampled = [],
             plot_title = title,
-            save_as = auto_output
-        )
+            output = auto_output,
+            dpi = 200
+        )  
 
         crosscorr_plot(
-            cross_hod = cmass_wise_cross_hod,
+            cmass_wise_hod = ngmatched_hod,
+            sampled = [],
             plot_title = title,
-            save_as = cross_output
+            output = cross_output,
+            dpi = 200
         )
 
-    # Plotting MCMC posteriors
+    # Posterior plot action
     elif args.action == 'posterior_plot':
-        samples_path = input('Enter path to MCMC chain results: ')
 
-        names = input('Enter parameter names: ')
-        names = list(map(lambda x: x.strip(), names.split(',')))
+        # Set samples, names, and labels
+        samples_path = ''
+        if samples_path == '':
+            samples_path = input('Enter path to MCMC chain results: ')
 
-        labels = input('Enter LaTeX labels for graph axes: ')
-        labels = list(map(lambda x: x.strip(), labels.split(',')))
+        names = []
+        if names == []:
+            names = input('Enter parameter names: ')
+            names = list(map(lambda x: x.strip(), names.split(',')))
 
-        save_as = input('Enter the graph output path: ')
+        labels = []
+        if labels == []:
+            labels = input('Enter LaTeX labels for graph axes: ')
+            labels = list(map(lambda x: x.strip(), labels.split(',')))
 
-        # Plotting posteriors
+        # Set posterior plot output
+        output = ''
+        if output == '':
+            output = input('Enter posterior plot output path: ')
+
+        # Generate posterior plot
         posterior_plot(
             samples_path = samples_path,
             names = names,
             labels = labels,
-            save_as = save_as
+            output = output
         )
 
-    # CMASS parameters grid search
-    elif args.action == 'gridsearch':
-        likelihood_func = cmass_wise_cross_hod.nbar_likelihood
-        output = 'results/grid1'
-        gridsearch(params, likelihood_func, output)
-
-    # Testing area
+    # Test action
     elif args.action == 'test':
+        print('TESTING BRANCH')
 
-        likelihood = cmass_wise_cross_hod.nbar_likelihood(
-            cmass_M_min = 12.94,
-            cmass_M_1 = 14.15,
-            cmass_alpha = 0.95,
-            cmass_M_0 = 13.05,
-            cmass_sig_logm = 0.43,
-            wise_M_min = 13.09,
-            wise_M_1 = 13.925,
-            wise_alpha = 0.97,
-            wise_M_0 = 12.94,
-            wise_sig_logm = 0.6,
-            R_ss = params["galaxy_corr"]["R_ss"]["val"],
-            R_cs = params["galaxy_corr"]["R_cs"]["val"],
-            R_sc = params["galaxy_corr"]["R_sc"]["val"]
-        )
+        hod_params_list = [
+            (13.04, 14.0, 0.950, 13.16, 0.43, 13.09, 13.775, 0.970, 13.44, 0.60),
+            (13.04, 14.0, 0.975, 13.16, 0.47, 13.09, 13.775, 0.990, 13.44, 0.58),
+            (12.94, 14.1, 0.950, 13.16, 0.43, 13.19, 13.775, 1.000, 13.64, 0.60),
+            (13.04, 14.0, 0.975, 13.26, 0.48, 13.09, 13.675, 1.025, 13.54, 0.55),
+            (13.14, 13.9, 1.000, 13.06, 0.53, 12.99, 13.875, 1.050, 13.44, 0.65),
+            (12.94, 14.1, 1.025, 13.16, 0.43, 13.19, 13.775, 0.950, 13.64, 0.60),
+            (13.04, 14.0, 1.050, 13.26, 0.48, 13.09, 13.675, 0.975, 13.54, 0.55),
+            (13.14, 13.9, 0.950, 13.06, 0.53, 12.99, 13.875, 1.000, 13.44, 0.65),
+            (12.94, 14.1, 0.975, 13.16, 0.43, 13.19, 13.775, 1.025, 13.64, 0.60),
+            (13.04, 14.0, 1.000, 13.26, 0.48, 13.09, 13.675, 1.050, 13.54, 0.55)
+        ]
 
-        print(likelihood)
+        # idx = 6
+
+        for idx in range(len(hod_params_list)):
+
+            exclusion_ngmatched = ngmatched_hod.nbar_components(
+                cmass_M_min = hod_params_list[idx][0],
+                cmass_M_1 = hod_params_list[idx][1],
+                cmass_alpha = hod_params_list[idx][2],
+                cmass_M_0 = hod_params_list[idx][3],
+                cmass_sig_logm = hod_params_list[idx][4],
+                wise_M_min = hod_params_list[idx][5],
+                wise_M_1 = hod_params_list[idx][6],
+                wise_alpha = hod_params_list[idx][7],
+                wise_M_0 = hod_params_list[idx][8],
+                wise_sig_logm = hod_params_list[idx][9],
+                R_ss = params["galaxy_corr"]["R_ss"]["val"],
+                R_cs = params["galaxy_corr"]["R_cs"]["val"],
+                R_sc = params["galaxy_corr"]["R_sc"]["val"]
+            )
+
+            print(f'Set {idx + 1}: NgMatched Exclusion ' + '-'*80)
+            print(f'- Autocorrelation log-likelihood: {exclusion_ngmatched["auto_loglike"]}')
+            print(f'- Cross-correlation log-likelihood: {exclusion_ngmatched["cross_loglike"]}')
+            print(f'- Total log-likelihood: {exclusion_ngmatched["total_loglike"]}')
+            print(f'- CMASS data nbar: {exclusion_ngmatched["cmass_nbar_data"]}')
+            print(f'- CMASS model nbar: {exclusion_ngmatched["cmass_nbar_model"]}')
+            print(f'- CMASS nbar correction: {exclusion_ngmatched["cmass_nbar_correction"]}')
+            print(f'- WISE data nbar: {exclusion_ngmatched["wise_nbar_data"]}')
+            print(f'- WISE model nbar: {exclusion_ngmatched["wise_nbar_model"]}')
+            print(f'- WISE nbar correction: {exclusion_ngmatched["wise_nbar_correction"]}')
 
 # ----------------------------------------------------------------------------------------------------------------------
