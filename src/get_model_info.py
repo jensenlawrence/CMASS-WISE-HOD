@@ -12,12 +12,18 @@ from astropy.cosmology import Planck15
 # Getting model parameters
 def get_model_params(params_file):
     """
-    get_model_params : str -> dict
-        Returns a combined dictionary of the BOSS-CMASS and WISE HOD model parameters provided in params_file.
+    Using the parameters provided in params_file, creates a combined dictionary of the BOSS-CMASS and WISE HOD model
+    parameters.
 
+    Parameters
+    ----------
     params_file : str
-        String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
-        WISE HOD models.
+        String representation of the path to the .json file containing the BOSS-CMASS and WISE HOD model parameters.
+
+    Returns
+    -------
+    model_params : dict
+        Dictionary containing the BOSS-CMASS and WISE HOD parameters.
     """
     with open(params_file) as f:
         model_params = json.load(f)
@@ -31,13 +37,20 @@ def get_model_params(params_file):
 # Generating model dictionaries
 def get_model_dicts(params_file):
     """
-    get_model_dicts : str -> dict, dict
-        Returns a dictionary of the BOSS-CMASS HOD model parameters and a dictionary of the WISE HOD model
-        parameters provided in params_file.
+    Using the parameters provided in params_file, creates a dictionary of the BOSS-CMASS HOD model parameters and a
+    dictionary of the WISE HOD model parameters that can be read by halomod.
 
+    Parameters
+    ----------
     params_file : str
-        String representation of the path to the .json file containing the parameters for the BOSS-CMASS and
-        WISE HOD models.
+        String representation of the path to the .json file containing the BOSS-CMASS and WISE HOD model parameters.
+
+    Returns
+    -------
+    cmass_model : dict
+        Dictionary containing the BOSS-CMASS HOD parameters in a format that halomod can read.
+    wise_model : dict
+        Dictionary containing the WISE HOD parameters in a format that halomod can read.
     """
     model_params = get_model_params(params_file)
     halo_params = model_params['halo_params']
