@@ -4,15 +4,10 @@ Based extensively on https://github.com/halomod/halomod but with a few modificat
 
 Dependencies:
 
-numpy
-
-scipy
-
-astropy
-
-camb
-
-numba
-
+numpy <br />
+scipy <br />
+astropy <br />
+camb <br />
+numba <br />
 cobaya
 
