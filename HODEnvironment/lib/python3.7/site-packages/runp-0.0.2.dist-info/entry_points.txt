@@ -1,0 +1,3 @@
+[console_scripts]
+runp = runp.runp:main
+
